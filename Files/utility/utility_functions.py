@@ -1,4 +1,7 @@
 import pandas as pd
+from typing import Literal, get_args
+
+_COMPARISON = Literal['=','<','>']
 
 def clean_database(source:str | pd.DataFrame, column_name:str, value:object, drop_column: bool=True, comparison: str = '=') -> pd.DataFrame:
     """ Creates a pandas DataFrame where all data[column_name] == value are kept.
@@ -32,14 +35,14 @@ def clean_database(source:str | pd.DataFrame, column_name:str, value:object, dro
     #data.index = pd.to_datetime(data.index)
 
     # Removing rows
+    options = get_args(_COMPARISON)
+    assert comparison in options, f"{comparison} is not in {options}"
     if comparison == '=':
         data = data[data[column_name] == value]
     elif comparison == '>':
         data = data[data[column_name] > value]
     elif comparison == '<':
         data = data[data[column_name] < value]
-    else:
-        raise Exception('comparison must be =, > or <')
 
     # Dropping columns
     if drop_column:
@@ -48,3 +51,24 @@ def clean_database(source:str | pd.DataFrame, column_name:str, value:object, dro
     return data
 
 
+def load_data(source: str) -> pd.DataFrame:
+    """ Loads the dataset.
+
+        Loads the dataset as saved by data_setup.ipynb.
+
+        Parameters
+        ----------
+        source: str
+            Name of the source CSV file
+        Returns
+        -------
+        database: pandas DataFrame
+            DataFrame with the clean data
+    """
+
+    data = pd.read_csv("merged_data.csv",index_col='time')
+    data.index = pd.to_datetime(data.index)
+    data.index = data.index.tz_localize(None)
+    data['Failure distance'] = pd.to_timedelta(data['Failure distance'])
+
+    return data

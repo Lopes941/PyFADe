@@ -1,6 +1,7 @@
 *.csv
 __pycache__
 
-Documentos/*
-Programas/Epic/*
+TimeSeries.ipynb
+Documents/*
+Files/Epic/*
 
