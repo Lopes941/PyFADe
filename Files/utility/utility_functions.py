@@ -1,7 +1,16 @@
 import pandas as pd
+import numpy as np
 from typing import Literal, get_args
+from os.path import join, dirname
 
 _COMPARISON = Literal['=','<','>']
+
+INTEGER_COLUMNS = ['outlier_',
+                   'extValues_',
+                   'peaks_',
+                   'Well aligned',
+                   'Choke',
+                   ]
 
 def clean_database(source:str | pd.DataFrame, column_name:str, value:object, drop_column: bool=True, comparison: str = '=') -> pd.DataFrame:
     """ Creates a pandas DataFrame where all data[column_name] == value are kept.
@@ -65,10 +74,71 @@ def load_data(source: str) -> pd.DataFrame:
         database: pandas DataFrame
             DataFrame with the clean data
     """
-
-    data = pd.read_csv("merged_data.csv",index_col='time')
+    
+    real_path = join(dirname(dirname(__file__)), source)
+    data = pd.read_csv(real_path,index_col='time')
     data.index = pd.to_datetime(data.index)
     data.index = data.index.tz_localize(None)
     data['Failure distance'] = pd.to_timedelta(data['Failure distance'])
 
     return data
+
+def get_well_data(source_data: str | pd.DataFrame, well_name: str, drop_columns: list = [], only_numerical: bool = False, remove_ints: bool = False, drop_na: bool = True, replace_na: float = 0) -> pd.DataFrame:
+    """ Loads the data from a given well.
+
+        Parameters
+        ----------
+        source_data: str or pandas DataFrame
+            Database. Can be given as a pandas DataFrame or as a string pointing to the source file. In this last case, the database is reloaded.
+
+        well_name: str
+            Well run name
+
+        drop_columns: list, optional
+            List containing columns to be dropped by name. All columns containing this name in some way are removed. For instance, if 'outlier_' is given, all columns that contain 'outlier_' in their name will be dropped.
+
+        only_numerical: bool, optional (default False)
+            If True, drops all non-numerical columns from the database.
+
+        remove_ints: bool, optional (default False)
+            If True, drops all columns that are known to be composed of integers.
+
+        drop_na: bool, optional (default True)
+            If True, drops all columns full of only NAs
+        
+        replace_na: float, optional (default 0)
+            Replace all NAs with this value if drop_na is true
+        
+        Returns
+        -------
+        well_data: pandas DataFrame
+            DataFrame with the data from specified well
+    """
+
+    # Loading database if input is string
+    if isinstance(source_data,str):
+        source_data = load_data(source_data)
+
+    
+    # Getting well data
+    well_data = source_data[source_data['Well Run'] == well_name]
+
+    # Dropping non-numerical
+    if only_numerical:
+        well_data = well_data.select_dtypes(include=[float])
+
+    # Dropping counted
+    if remove_ints:
+        for int_col in INTEGER_COLUMNS:
+            well_data.drop(list(well_data.filter(regex=int_col)), inplace=True,axis=1)
+
+    # Dropping given columns
+    for drop_col in drop_columns:
+        well_data.drop(list(well_data.filter(regex=drop_col)), inplace=True, axis=1)
+
+    # Dropping Na columns
+    if drop_na:
+        well_data.dropna(axis=1, how='all', inplace=True)
+        well_data.fillna(replace_na, inplace=True)
+        
+    return well_data
