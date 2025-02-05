@@ -2,6 +2,7 @@ import pandas as pd
 import numpy as np
 from typing import Literal, get_args
 from os.path import join, dirname
+from typing import Literal, Tuple, Union, Any
 
 _COMPARISON = Literal['=','<','>']
 
@@ -83,7 +84,7 @@ def load_data(source: str) -> pd.DataFrame:
 
     return data
 
-def get_well_data(source_data: str | pd.DataFrame, well_name: str, drop_columns: list = [], only_numerical: bool = False, remove_ints: bool = False, drop_na: bool = True, replace_na: float = 0) -> pd.DataFrame:
+def get_well_data(source_data: str | pd.DataFrame, well_name: str, drop_columns: list = [], only_numerical: bool = False, remove_ints: bool = False, drop_na: bool = True, replace_na: float = np.nan) -> pd.DataFrame:
     """ Loads the data from a given well.
 
         Parameters
@@ -106,8 +107,8 @@ def get_well_data(source_data: str | pd.DataFrame, well_name: str, drop_columns:
         drop_na: bool, optional (default True)
             If True, drops all columns full of only NAs
         
-        replace_na: float, optional (default 0)
-            Replace all NAs with this value if drop_na is true
+        replace_na: float, optional (default np.nan)
+            Replace all NAs with this value if drop_na is true.
         
         Returns
         -------
@@ -139,6 +140,63 @@ def get_well_data(source_data: str | pd.DataFrame, well_name: str, drop_columns:
     # Dropping Na columns
     if drop_na:
         well_data.dropna(axis=1, how='all', inplace=True)
+
+    if replace_na != np.nan:
         well_data.fillna(replace_na, inplace=True)
         
     return well_data
+
+def get_sub_sequence(data: Union[pd.DataFrame, pd.Series, np.ndarray], start, end = None, size: int = 0, return_gaps: bool = False) -> Union[Any, Tuple[ Any, list]]:
+    """ Gets a subsequence of a time series based on the given start and end or size.
+
+        
+        Parameters
+        ----------
+        data: pandas.DataFrame or pandas.Series or numpy.ndarray
+            Set of data from which sub_sequences will be generated.
+            In case of multi-dimensional time series given as a numpy ndarray, its dimensions must be:
+            data.size == (num_dim, series_size)
+        start: int, index of pandas.DataFrame
+            Start point from the returned subsequence.
+        end: int, index of pandas.DataFrame
+            End point from the returned subsequence, end point not included!
+        size: int, optional
+            Size of the subsequence.
+        return_gaps: bool, optional (default = False)
+            Changes the return variables to include the gaps in this signal.
+
+        Returns
+        -------
+        sub_data: pandas.DataFrame or pandas.Series or numpy.ndarray
+            Obtained subsequence. Will be of same type as input data.
+        gaps: 
+            L
+    """
+
+    # Checking size and end inputs
+    if size == 0 and end is None:
+        raise Exception('Either size or end must be given!')
+    if size != 0 and end is not None:
+        if start + size != end:
+            warnings.warn('Both size and end were given, but they are not consistent, end variable used.')
+
+    # Calculating end if necessary
+    if end is None:
+        end = start + size
+    
+    if isinstance(data, np.ndarray):
+
+        if data.ndim == 1:
+            sub_data = data[np.newaxis, start:end]
+        else:
+            sub_data = data[:, start:end]
+
+
+    else:
+    
+        sub_data = data.loc[start:end]
+
+
+    return sub_data
+
+#
