@@ -1,10 +1,40 @@
+__pycache__
 *.csv
 *.gif
-__pycache__
+*.py[co]
+.DS_Store
+.pytest_cache/
+
+
+# Packages
+*.egg
+*.egg-info
+dist
+build
+_build
+.installed.cfg
+
+# Installer logs
+pip-log.txt
+
+# Sphinx documentation
+doc/_build/
+doc/build/
+.jupyterlite.doit.db
+/doc/jupyter_execute/
+doc/source/regression/*.ipynb
+
+# Editors
+.idea
+.project
+.pydevproject
+.settings
+
+
 
 TimeSeries.ipynb
 Documents/*
-Files/Epic/*
+Epic/*
 
-Files/wavelet_test.py
-Files/wavelet_test2.py
+wavelet_test.py
+wavelet_test2.py

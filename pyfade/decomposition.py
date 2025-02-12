@@ -3,53 +3,11 @@ import pandas as pd
 
 from matplotlib import pyplot as plt
 import pywt
-from .preprocessing import _extract_values
-from .plot import print_multiple
 
 from typing import Literal, Tuple, Union, Any
 
 
-
-def wavelet_cwd(data: Union[pd.DataFrame, pd.Series, np.ndarray], wavelet: str = 'cmor1.5-1.5', create_plot: bool = True, sampling_period: float = 1, period_interval: np.ndarray = np.linspace(1,24,100)) -> Union[tuple, Tuple[tuple,tuple]]:
-
-    # Extracting values
-    values, _ = _extract_values(data)
-
-
-    periods = period_interval / sampling_period
-    freq_interval = 1/periods
-    scale = pywt.frequency2scale(wavelet, freq_interval)
-
-    coef, freqs = pywt.cwt(values[0,:], scale, wavelet, sampling_period=sampling_period)
-    coef = np.abs(coef[:-1,:-1])
-    coef = coef**(1/3)
-    periods = 1/freqs
-
-    if create_plot:
-
-        fig, axs = plt.subplots(2, 1, layout='constrained')
-
-        if isinstance(data, np.ndarray):
-            index = np.arange(values.shape[1])
-            axs[0].plot(values[0,:])
-        else:
-            index = data.index
-            axs[0].plot(index,values[0,:])
-
-        axs[0].set_xlim([index.min(),index.max()])
-
-        axs[0].grid(True)
-        pcm = axs[1].pcolormesh(index, periods, coef)
-        fig.colorbar(pcm, ax=axs[1])
-
-        return (coef,periods), (fig, axs)
-
-    else:    
-
-        return coef, periods
-
-
-def get_signal_decomp(data: Union[pd.DataFrame, pd.Series, np.ndarray], wavelet: str = 'haar', create_plot: bool = False, level: int = 1, height: float = 1, width: float = 7) -> Any:
+def get_signal_decomp(data: Union[pd.DataFrame, pd.Series, np.ndarray], wavelet: str = 'haar', create_plot: bool = False, level: int = 1, height: float = 1, width: float = 7, **kwargs) -> Any:
     """ Perform a multi-level discrete wavelet decomposition. Returns recomposed signals at each level and coefficients.
 
         Performs a multi-level discrete wavelet decompostion on a signal. Returns the resulting signal from each decomposition level (approximation and detail) and their respective coefficients.
@@ -84,15 +42,20 @@ def get_signal_decomp(data: Union[pd.DataFrame, pd.Series, np.ndarray], wavelet:
             decomp_coef = ( (coef_A_1, coef_D_1), (coef_A_2, coef_D_2), ..., (coef_A_n, coef_D_n))
     """
 
-    # Extracting values
-    values, _ = _extract_values(data)
-
-
-    # Getting index
+    # Getting index and value
     if isinstance(data, np.ndarray):
+        values = data
+        if values.ndim == 1:
+            values = values[np.newaxis,:]
         index = np.arange(values.shape[1])
-    else:
+    elif isinstance(data,pd.Series):
+        values = data.values
+        values = values[np.newaxis,:]
         index = data.index
+    elif isinstance(data,pd.DataFrame):
+        values = data.values.T
+        index = data.index
+        
 
     # Creating variables
     decomp_sig = [None]*level
@@ -114,7 +77,7 @@ def get_signal_decomp(data: Union[pd.DataFrame, pd.Series, np.ndarray], wavelet:
         sig_D = pywt.waverec(coef_D, wavelet=wavelet)
 
         # Getting reconstructed index
-        if isinstance(data, np.ndarray):
+        if isinstance(data, np.ndarray) or not isinstance(index,pd.DatetimeIndex):
             new_ind_A = np.interp(np.linspace(0,1,sig_A.size),np.linspace(0,1,index.size),index)
             new_ind_D = np.interp(np.linspace(0,1,sig_D.size),np.linspace(0,1,index.size),index)
 
@@ -124,6 +87,8 @@ def get_signal_decomp(data: Union[pd.DataFrame, pd.Series, np.ndarray], wavelet:
 
         # Writing signal and coefficient
         decomp_sig[lvl] = [pd.Series(sig_A,index=new_ind_A), pd.Series(sig_D,index=new_ind_D)]
+        decomp_sig[lvl][0].name = f'Approximation {lvl+1}'
+        decomp_sig[lvl][1].name = f'Detail {lvl+1}'
         decomp_coef[lvl] = (cA, cD)
 
 

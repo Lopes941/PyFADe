@@ -1,0 +1,28 @@
+[build-system]
+build-backend = "setuptools.build_meta"
+requires = [
+    "setuptools >= 61.0",
+
+    "numpy>=2.0.0",
+    "Cython>=3.0.4"
+]
+
+
+[project]
+name = "PyFADe"
+version = "0.0.1"
+authors = [
+    {name = "Heitor Nigro Lopes", email = "hnlopes@unicamp.br"},
+]
+description = "PyFADe, failure and anomaly detection module"
+readme = "README.rst"
+dependencies = ["numpy>=1.23"]
+classifiers = [
+    "Programming Language :: Python",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+]
+
