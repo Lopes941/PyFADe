@@ -1,3 +1,6 @@
+"""
+Functions for creating figures from data
+"""
 
 import numpy as np
 import pandas as pd
@@ -5,18 +8,14 @@ import matplotlib
 import matplotlib.pyplot as plt
 
 
-from .preprocessing import _extract_values
 from typing import Tuple, Union
 
-
+# TODO add docstring
 def _plot_multiple_series(data:pd.Series, height: float, width: float, ylimits: list, xlabel: str, ylabel: str | list,fig,axs) -> Tuple[matplotlib.figure.Figure, list]:
-
-    # Extracting values
-    values, num_dim = _extract_values(data)
 
     # Creating window and axes
     if fig is None or axs is None:
-        fig, axs = plt.subplots(num_dim, sharex=True, gridspec_kw={'hspace': 0},figsize=[width,height*num_dim])
+        fig, axs = plt.subplots(1, sharex=True, gridspec_kw={'hspace': 0},figsize=[width,height])
         style = 'b-'
     else:
         axs = [ax.twinx() for ax in axs]
@@ -25,28 +24,27 @@ def _plot_multiple_series(data:pd.Series, height: float, width: float, ylimits: 
     # Generating the ylabel list
     if ylabel is None:
         ylabel = data.name
-    if isinstance(ylabel, str):
-        if  num_dim == 1:
-            ylabel = [ylabel]
-    if len(ylabel) != num_dim:
-        raise Exception('Size of ylabel must be the same as the number of data given!')
-
-    # Making axs a list, so nothing breaks
-    axs = [axs]
+    elif isinstance(ylabel,list):
+        ylabel = ylabel[0]
     
     # Plotting data
-    for k in range(num_dim):
-        axs[k].plot(data.index,values[k,:],style)
-        if ylimits is not None:
-            axs[k].set_ylim(ylimits)
-        axs[k].grid(True)
-        axs[k].set_ylabel(ylabel[k])
-        axs[k].set_xlabel(xlabel)
+    axs.plot(data.index,data.values,style)
+    if ylimits is not None:
+        axs.set_ylim(ylimits)
+    axs.grid(True)
+    axs.set_ylabel(ylabel)
+    axs.set_xlabel(xlabel)
 
+    return fig, [axs]
+
+# TODO add docstring
 def _plot_multiple_ndarray(data: np.ndarray, height: float, width: float, ylimits: list, xlabel: str, ylabel: str | list,fig,axs) -> Tuple[matplotlib.figure.Figure, list]:
 
     # Extracting values
-    values, num_dim = _extract_values(data)
+    values = data
+    if values.ndim == 1:
+        values = values[np.newaxis,:]
+    num_dim = values.shape[0]
 
     # Creating window and axes
     if fig is None or axs is None:
@@ -88,6 +86,7 @@ def _plot_multiple_ndarray(data: np.ndarray, height: float, width: float, ylimit
 
     return fig, axs
 
+# TODO add docstring
 def _plot_multiple_list(data: list, height: float, width: float, ylimits: list, xlabel: str, ylabel: str | list,fig,axs) -> Tuple[matplotlib.figure.Figure, list]:
     
 
@@ -104,7 +103,12 @@ def _plot_multiple_list(data: list, height: float, width: float, ylimits: list, 
 
     # Generating the ylabel list
     if ylabel is None:
-        ylabel = 'Signal'
+        if isinstance(data[0],pd.Series):
+            ylabel = [df.name for df in data]
+        elif isinstance(data[0],pd.DataFrame):
+            ylabel = [df.columns[0] for df in data]
+        else:
+            ylabel = 'Signal'
     if isinstance(ylabel, str):
         if  num_dim == 1:
             ylabel = [ylabel]
@@ -125,14 +129,25 @@ def _plot_multiple_list(data: list, height: float, width: float, ylimits: list, 
             axs[k].grid(True)
             axs[k].set_ylabel(ylabel[k])
             axs[k].set_xlabel(xlabel)
+
+        elif isinstance(idata, pd.DataFrame):
+
+            axs[k].plot(idata.index,idata.values[:,0],style)
+            if ylimits is not None:
+                axs[k].set_ylim(ylimits)
+            axs[k].grid(True)
+            axs[k].set_ylabel(ylabel[k])
+            axs[k].set_xlabel(xlabel)
     
 
     return fig, axs
 
+# TODO add docstring
 def _plot_multiple_dataframe(data: pd.DataFrame, height: float, width: float, ylimits: list, xlabel: str, ylabel: str | list,fig,axs) -> Tuple[matplotlib.figure.Figure, list]:
 
     # Extracting values
-    values, num_dim = _extract_values(data)
+    values = data.values.T
+    num_dim = values.shape[0]
 
     # Creating window and axes
     if fig is None or axs is None:
@@ -164,7 +179,7 @@ def _plot_multiple_dataframe(data: pd.DataFrame, height: float, width: float, yl
     return fig, axs
 
 
-def print_multiple(data: Union[pd.DataFrame, pd.Series, np.ndarray, list], height: float = 1, width: float = 7, ylimits: list = None, xlabel: str = 'Timestamp', ylabel: str | list = None, fig = None, axs = None) -> Tuple[matplotlib.figure.Figure, list]: 
+def plot_multiple(data: Union[pd.DataFrame, pd.Series, np.ndarray, list], height: float = 1, width: float = 7, ylimits: list = None, xlabel: str = 'Timestamp', ylabel: str | list = None, fig = None, axs = None) -> Tuple[matplotlib.figure.Figure, list]: 
     """ Creates a window with multiple plots alignes vertically.
 
         Parameters

@@ -1,11 +1,10 @@
 import numpy as np
 import pandas as pd
-import matplotlib
-import os
 
+from time import perf_counter
 from matplotlib import pyplot as plt
-from utility import load_data, get_well_data, get_sub_sequence
-from models import Filter_type, get_filter, apply_filter, get_MP, print_multiple, get_KDP, get_MP_from_wavelets, get_signal_decomp
+from pyfade import load_data, get_well_data, get_sub_sequence
+from pyfade import Filter_type, get_filter, apply_filter, get_MP, print_multiple, get_KDP, get_MP_from_wavelets, get_signal_decomp
 
 # Source file of data
 source_file = 'EPIC/Dados/merged_data.csv'
@@ -20,11 +19,11 @@ well_data = well_data['ESP motor temperature']
 
 
 # Get interval
-start_date = pd.Timestamp('2018-5-01')
+start_date = pd.Timestamp('2018-01-01')
 end_date = pd.Timestamp('2018-08-01')
 
-#sub_data = get_sub_sequence(well_data, start_date, end=end_date)
-sub_data = well_data.copy()
+sub_data = get_sub_sequence(well_data, start_date, end=end_date)
+#sub_data = well_data.copy()
 sub_data.interpolate(method='linear',inplace=True)
 sub_data.dropna(inplace=True)
 
@@ -36,7 +35,21 @@ sub_data.dropna(inplace=True)
 #         period_interval=np.linspace(1, 72, 100),wavelet='cmor12-2')
 
 wavelet = 'db1'
-MPs = get_MP_from_wavelets(sub_data,subseq_size=24*3,level=9,wavelet=wavelet,ignore_start=True, quartile=0.75,create_plot=True,plot_data=True)
+
+
+#MPs = get_MP(sub_data.values,subseq_size=24*3)
+sub_size = 7*24
+ti = perf_counter()
+MPs = get_MP_from_wavelets(sub_data,subseq_size=sub_size,level=6,wavelet=wavelet,ignore_start=True, quartile=0.75,create_plot=True,plot_data=True, on_signals=True)
+to = perf_counter() -ti
+print(f'Time: {to:0.2f} s')
+
+
+ti = perf_counter()
+K, _= get_KDP(sub_data,sub_size,pre_calc_MP=MPs)
+to = perf_counter() -ti
+print(f'Time: {to:0.2f} s')
+print_multiple(K)
 
 
 # # Define and apply filter

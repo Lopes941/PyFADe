@@ -1,8 +1,10 @@
 import pandas as pd
 import numpy as np
+import warnings
 from typing import Literal, get_args
 from os.path import join, dirname
 from typing import Literal, Tuple, Union, Any
+
 
 _COMPARISON = Literal['=','<','>']
 
@@ -14,7 +16,7 @@ INTEGER_COLUMNS = ['outlier_',
                    ]
 
 def clean_database(source:str | pd.DataFrame, column_name:str, value:object, drop_column: bool=True, comparison: str = '=') -> pd.DataFrame:
-    """ Creates a pandas DataFrame where all data[column_name] == value are kept.
+    """ Creates a pandas DataFrame where all data where "data[column_name] == value" are kept.
 
         Loads the file named source or a DataFrame object, and creates a DataFrame where all rows in which column_name == 0 are removed.
 
@@ -42,7 +44,7 @@ def clean_database(source:str | pd.DataFrame, column_name:str, value:object, dro
         data = source.copy()
     else:
         data = pd.read_csv(source)
-    #data.index = pd.to_datetime(data.index)
+    data.index = pd.to_datetime(data.index)
 
     # Removing rows
     options = get_args(_COMPARISON)
@@ -59,7 +61,6 @@ def clean_database(source:str | pd.DataFrame, column_name:str, value:object, dro
         data.drop(column_name, axis=1, inplace=True)
 
     return data
-
 
 def load_data(source: str) -> pd.DataFrame:
     """ Loads the dataset.
@@ -120,7 +121,6 @@ def get_well_data(source_data: str | pd.DataFrame, well_name: str, drop_columns:
     if isinstance(source_data,str):
         source_data = load_data(source_data)
 
-    
     # Getting well data
     well_data = source_data[source_data['Well Run'] == well_name]
 
@@ -199,4 +199,3 @@ def get_sub_sequence(data: Union[pd.DataFrame, pd.Series, np.ndarray], start, en
 
     return sub_data
 
-#
