@@ -179,7 +179,11 @@ def _plot_multiple_dataframe(data: pd.DataFrame, height: float, width: float, yl
     return fig, axs
 
 
+<<<<<<< HEAD
 def plot_multiple(data: Union[pd.DataFrame, pd.Series, np.ndarray, list], height: float = 1, width: float = 7, ylimits: list = None, xlabel: str = 'Timestamp', ylabel: str | list = None, fig = None, axs = None, **kwargs) -> Tuple[matplotlib.figure.Figure, list]: 
+=======
+def plot_multiple(data: Union[pd.DataFrame, pd.Series, np.ndarray, list], height: float = 1, width: float = 7, ylimits: list = None, xlabel: str = 'Timestamp', ylabel: str | list = None, fig = None, axs = None) -> Tuple[matplotlib.figure.Figure, list]: 
+>>>>>>> 6e4febcb05cc92ae2528ad59489a503fc5a19bca
     """ Creates a window with multiple plots alignes vertically.
 
         Parameters

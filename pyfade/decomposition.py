@@ -7,7 +7,11 @@ import pywt
 from typing import Literal, Tuple, Union, Any
 
 
+<<<<<<< HEAD
 def get_signal_decomp(data: Union[pd.DataFrame, pd.Series, np.ndarray], wavelet: str = 'haar', create_plot: bool = False, level: int = 1, height: float = 1, width: float = 7, **kwargs) -> Any:
+=======
+def get_signal_decomp(data: Union[pd.DataFrame, pd.Series, np.ndarray], wavelet: str = 'haar', create_plot: bool = False, level: int = 1, height: float = 1, width: float = 7) -> Any:
+>>>>>>> 6e4febcb05cc92ae2528ad59489a503fc5a19bca
     """ Perform a multi-level discrete wavelet decomposition. Returns recomposed signals at each level and coefficients.
 
         Performs a multi-level discrete wavelet decompostion on a signal. Returns the resulting signal from each decomposition level (approximation and detail) and their respective coefficients.
@@ -77,7 +81,11 @@ def get_signal_decomp(data: Union[pd.DataFrame, pd.Series, np.ndarray], wavelet:
         sig_D = pywt.waverec(coef_D, wavelet=wavelet)
 
         # Getting reconstructed index
+<<<<<<< HEAD
         if isinstance(data, np.ndarray) or not isinstance(index,pd.DatetimeIndex):
+=======
+        if isinstance(data, np.ndarray) or not isinstance(index,pd.Timestamp):
+>>>>>>> 6e4febcb05cc92ae2528ad59489a503fc5a19bca
             new_ind_A = np.interp(np.linspace(0,1,sig_A.size),np.linspace(0,1,index.size),index)
             new_ind_D = np.interp(np.linspace(0,1,sig_D.size),np.linspace(0,1,index.size),index)
 
@@ -87,8 +95,13 @@ def get_signal_decomp(data: Union[pd.DataFrame, pd.Series, np.ndarray], wavelet:
 
         # Writing signal and coefficient
         decomp_sig[lvl] = [pd.Series(sig_A,index=new_ind_A), pd.Series(sig_D,index=new_ind_D)]
+<<<<<<< HEAD
         decomp_sig[lvl][0].name = f'Approximation {lvl+1}'
         decomp_sig[lvl][1].name = f'Detail {lvl+1}'
+=======
+        decomp_sig[lvl][0].name = f'Approximation {lvl}'
+        decomp_sig[lvl][1].name = f'Detail {lvl}'
+>>>>>>> 6e4febcb05cc92ae2528ad59489a503fc5a19bca
         decomp_coef[lvl] = (cA, cD)
 
 
