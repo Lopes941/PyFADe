@@ -277,10 +277,10 @@ def apply_filter(data: Union[pd.DataFrame, pd.Series, np.ndarray], num_coefs: np
     
     if isinstance(data,pd.DataFrame):
         index = data.index
-        filtered_data = pd.DataFrame(filtered_data.T,index=index)
+        filtered_data = pd.DataFrame(filtered_data.T,index=index,columns=[f'Filtered {d}' for d in range(1,num_dim+1)])
     elif isinstance(data, pd.Series):
         index = data.index
-        filtered_data = pd.Series(filtered_data,index=index)
+        filtered_data = pd.Series(filtered_data,index=index,name='Filtered')
 
     return filtered_data
 

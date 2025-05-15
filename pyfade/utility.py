@@ -2,7 +2,6 @@ import pandas as pd
 import numpy as np
 import warnings
 from typing import Literal, get_args
-from os.path import join, dirname
 from typing import Literal, Tuple, Union, Any
 
 
@@ -14,6 +13,20 @@ INTEGER_COLUMNS = ['outlier_',
                    'Well aligned',
                    'Choke',
                    ]
+
+FEATURE_COLUMNS =  ['outlier_',
+                    'extValues_',
+                    'peaks_',
+                    'max_change_'
+                    ]
+
+def _block_group(group, data):
+
+    start = group.index[0]
+    end = data.index[data.index.get_loc(group.index[-1])+1]
+    size = end-start
+
+    return start, size
 
 def clean_database(source:str | pd.DataFrame, column_name:str, value:object, drop_column: bool=True, comparison: str = '=') -> pd.DataFrame:
     """ Creates a pandas DataFrame where all data where "data[column_name] == value" are kept.
@@ -77,15 +90,14 @@ def load_data(source: str) -> pd.DataFrame:
             DataFrame with the clean data
     """
     
-    real_path = join(dirname(dirname(__file__)), source)
-    data = pd.read_csv(real_path,index_col='time')
+    data = pd.read_csv(source,index_col='time')
     data.index = pd.to_datetime(data.index)
     data.index = data.index.tz_localize(None)
     data['Failure distance'] = pd.to_timedelta(data['Failure distance'])
 
     return data
 
-def get_well_data(source_data: str | pd.DataFrame, well_name: str, drop_columns: list = [], only_numerical: bool = False, remove_ints: bool = False, drop_na: bool = True, replace_na: float = np.nan) -> pd.DataFrame:
+def get_well_data(source_data: str | pd.DataFrame, well_name: str, drop_columns: list = [], only_numerical: bool = False, remove_ints: bool = False, drop_na: bool = True, replace_na: float = np.nan, drop_features: bool = False) -> pd.DataFrame:
     """ Loads the data from a given well.
 
         Parameters
@@ -132,6 +144,11 @@ def get_well_data(source_data: str | pd.DataFrame, well_name: str, drop_columns:
     if remove_ints:
         for int_col in INTEGER_COLUMNS:
             well_data.drop(list(well_data.filter(regex=int_col)), inplace=True,axis=1)
+
+    # Dropping features
+    if drop_features:
+        for feat_col in FEATURE_COLUMNS:
+            well_data.drop(list(well_data.filter(regex=feat_col)), inplace=True,axis=1)
 
     # Dropping given columns
     for drop_col in drop_columns:
@@ -199,3 +216,35 @@ def get_sub_sequence(data: Union[pd.DataFrame, pd.Series, np.ndarray], start, en
 
     return sub_data
 
+def get_shutdowns(data: Union[pd.DataFrame, pd.Series]):
+
+    if isinstance(data,pd.DataFrame):
+        num_dim = data.columns.size
+    elif isinstance(data,pd.Series):
+        num_dim = 1
+    else:
+        raise ValueError('Data must be DataFrame or Series')
+    
+    shutdowns = [None] * num_dim
+
+    for i in range(data.columns.size):
+
+
+        idata = data.iloc[:,i].resample('1h').mean()
+        idata = idata.loc[idata.first_valid_index():idata.last_valid_index()]
+
+        # Create a boolean mask where True represents NA values
+        is_na = idata.isna()
+
+        # Identify where the NA blocks start by shifting the mask
+        block_start = is_na & ~is_na.shift(1, fill_value=False)
+
+        # Label each block of NA values
+        block_labels = block_start.cumsum()
+
+        # Group by blocks and calculate the start index and size of each block
+        shutdowns[i] = np.array(idata[is_na].groupby(block_labels).apply(_block_group, data=idata).tolist())
+
+
+    return shutdowns
+        

@@ -7,19 +7,24 @@ import pandas as pd
 import matplotlib
 import matplotlib.pyplot as plt
 
-
 from typing import Tuple, Union
 
-# TODO add docstring
-def _plot_multiple_series(data:pd.Series, height: float, width: float, ylimits: list, xlabel: str, ylabel: str | list,fig,axs) -> Tuple[matplotlib.figure.Figure, list]:
+HSPACE = 0.2
 
+# TODO add docstring
+def _plot_multiple_series(data:pd.Series, height: float, width: float, ylimits: list, xlabel: str, ylabel: str | list,style,fig,axs, **kwargs) -> Tuple[matplotlib.figure.Figure, list]:
+
+    second_plot = False
     # Creating window and axes
     if fig is None or axs is None:
-        fig, axs = plt.subplots(1, sharex=True, gridspec_kw={'hspace': 0},figsize=[width,height])
-        style = 'b-'
+        fig, axs = plt.subplots(1, sharex=True, gridspec_kw={'hspace': HSPACE},figsize=[width,height])
+        if style is None:
+            style = 'b-'
     else:
+        second_plot = True
         axs = [ax.twinx() for ax in axs]
-        style = 'r-'
+        if style is None:
+            style = 'r-'
 
     # Generating the ylabel list
     if ylabel is None:
@@ -28,31 +33,37 @@ def _plot_multiple_series(data:pd.Series, height: float, width: float, ylimits: 
         ylabel = ylabel[0]
     
     # Plotting data
-    axs.plot(data.index,data.values,style)
+    axs.plot(data.index,data.values,style, **kwargs)
     if ylimits is not None:
         axs.set_ylim(ylimits)
-    axs.grid(True)
+    axs.grid(not second_plot)
     axs.set_ylabel(ylabel)
     axs.set_xlabel(xlabel)
 
     return fig, [axs]
 
 # TODO add docstring
-def _plot_multiple_ndarray(data: np.ndarray, height: float, width: float, ylimits: list, xlabel: str, ylabel: str | list,fig,axs) -> Tuple[matplotlib.figure.Figure, list]:
+def _plot_multiple_ndarray(data: np.ndarray, height: float, width: float, ylimits: list, xlabel: str, ylabel: str | list,style,fig,axs, **kwargs) -> Tuple[matplotlib.figure.Figure, list]:
 
     # Extracting values
     values = data
     if values.ndim == 1:
         values = values[np.newaxis,:]
     num_dim = values.shape[0]
+    second_plot = False
 
     # Creating window and axes
     if fig is None or axs is None:
-        fig, axs = plt.subplots(num_dim, sharex=True, gridspec_kw={'hspace': 0},figsize=[width,height*num_dim])
-        style = 'b-'
+        fig, axs = plt.subplots(num_dim, sharex=True, gridspec_kw={'hspace': HSPACE},figsize=[width,height*num_dim])
+        if style is None:
+            style = 'b-'
+        if num_dim == 1:
+            axs = [axs]
     else:
+        second_plot = True
         axs = [ax.twinx() for ax in axs]
-        style = 'r-'
+        if style is None:
+            style = 'r-'
 
     # Generating the ylabel list
     if ylabel is None:
@@ -76,10 +87,10 @@ def _plot_multiple_ndarray(data: np.ndarray, height: float, width: float, ylimit
     
     # Plotting data
     for k in range(num_dim):
-        axs[k].plot(values[k,:],style)
+        axs[k].plot(values[k,:],style, **kwargs)
         if ylimits is not None:
             axs[k].set_ylim(ylimits)
-        axs[k].grid(True)
+        axs[k].grid(not second_plot)
         axs[k].set_ylabel(ylabel[k])
         axs[k].set_xlim(xlimits)
         axs[k].set_xlabel(xlabel)
@@ -87,19 +98,26 @@ def _plot_multiple_ndarray(data: np.ndarray, height: float, width: float, ylimit
     return fig, axs
 
 # TODO add docstring
-def _plot_multiple_list(data: list, height: float, width: float, ylimits: list, xlabel: str, ylabel: str | list,fig,axs) -> Tuple[matplotlib.figure.Figure, list]:
+def _plot_multiple_list(data: list, height: float, width: float, ylimits: list, xlabel: str, ylabel: str | list,style,fig,axs, same_limits, **kwargs) -> Tuple[matplotlib.figure.Figure, list]:
     
 
     # Extracting values
     num_dim = len(data)
+    second_plot = False
 
     # Creating window and axes
     if fig is None or axs is None:
-        fig, axs = plt.subplots(num_dim, sharex=True, gridspec_kw={'hspace': 0},figsize=[width,height*num_dim])
-        style = 'b-'
+        fig, axs = plt.subplots(num_dim, sharex=True, gridspec_kw={'hspace': HSPACE},figsize=[width,height*num_dim])
+        if style is None:
+            style = 'b-'
+        if num_dim == 1:
+            axs = [axs]
     else:
+        second_plot = True
         axs = [ax.twinx() for ax in axs]
-        style = 'r-'
+        if style is None:
+            style = 'r-'
+    
 
     # Generating the ylabel list
     if ylabel is None:
@@ -118,12 +136,24 @@ def _plot_multiple_list(data: list, height: float, width: float, ylimits: list, 
     if len(ylabel) != num_dim:
         raise Exception('Size of ylabel must be the same as the number of data given!')
     
+    if same_limits:
+        if isinstance(data[0], pd.Series):
+            min_y = np.min([idata.abs().min() for idata in data])*0.95
+            max_y = np.max([idata.abs().max() for idata in data])*1.05
+        elif isinstance(data[0], pd.DataFrame):
+            min_y = np.min([idata.iloc[:,0].abs().min() for idata in data])*0.95
+            max_y = np.max([idata.iloc[:,0].abs().max() for idata in data])*1.05
+
+        ylimits = [min_y, max_y]
+
+
+    
 
     for k, idata in enumerate(data):
 
         if isinstance(idata, pd.Series):
 
-            axs[k].plot(idata.index,idata.values,style)
+            axs[k].plot(idata.index,idata.values,style, **kwargs)
             if ylimits is not None:
                 axs[k].set_ylim(ylimits)
             axs[k].grid(True)
@@ -132,10 +162,10 @@ def _plot_multiple_list(data: list, height: float, width: float, ylimits: list, 
 
         elif isinstance(idata, pd.DataFrame):
 
-            axs[k].plot(idata.index,idata.values[:,0],style)
+            axs[k].plot(idata.index,idata.values[:,0],style, **kwargs)
             if ylimits is not None:
                 axs[k].set_ylim(ylimits)
-            axs[k].grid(True)
+            axs[k].grid(not second_plot)
             axs[k].set_ylabel(ylabel[k])
             axs[k].set_xlabel(xlabel)
     
@@ -143,19 +173,25 @@ def _plot_multiple_list(data: list, height: float, width: float, ylimits: list, 
     return fig, axs
 
 # TODO add docstring
-def _plot_multiple_dataframe(data: pd.DataFrame, height: float, width: float, ylimits: list, xlabel: str, ylabel: str | list,fig,axs) -> Tuple[matplotlib.figure.Figure, list]:
+def _plot_multiple_dataframe(data: pd.DataFrame, height: float, width: float, ylimits: list, xlabel: str, ylabel: str | list,style,fig,axs, **kwargs) -> Tuple[matplotlib.figure.Figure, list]:
 
     # Extracting values
     values = data.values.T
     num_dim = values.shape[0]
+    second_plot = False
 
     # Creating window and axes
     if fig is None or axs is None:
-        fig, axs = plt.subplots(num_dim, sharex=True, gridspec_kw={'hspace': 0},figsize=[width,height*num_dim])
-        style = 'b-'
+        fig, axs = plt.subplots(num_dim, sharex=True, gridspec_kw={'hspace': HSPACE},figsize=[width,height*num_dim])
+        if style is None:
+            style = 'b-'
+        if num_dim == 1:
+            axs = [axs]
     else:
+        second_plot = True
         axs = [ax.twinx() for ax in axs]
-        style = 'r-'
+        if style is None:
+            style = 'r-'
 
     # Generating the ylabel list
     if ylabel is None:
@@ -168,22 +204,26 @@ def _plot_multiple_dataframe(data: pd.DataFrame, height: float, width: float, yl
     
     # Plotting data
     for k in range(num_dim):
-        axs[k].plot(data.index,values[k,:],style)
+        axs[k].plot(data.index,values[k,:],style, **kwargs)
         if ylimits is not None:
             axs[k].set_ylim(ylimits)
-        axs[k].grid(True)
+        axs[k].grid(not second_plot)
         axs[k].set_ylabel(ylabel[k])
         axs[k].set_xlabel(xlabel)
 
 
     return fig, axs
 
+# TODO add docstring
+def plot_shutdown(shutdowns: np.ndarray, fig, axs):
 
-<<<<<<< HEAD
-def plot_multiple(data: Union[pd.DataFrame, pd.Series, np.ndarray, list], height: float = 1, width: float = 7, ylimits: list = None, xlabel: str = 'Timestamp', ylabel: str | list = None, fig = None, axs = None, **kwargs) -> Tuple[matplotlib.figure.Figure, list]: 
-=======
-def plot_multiple(data: Union[pd.DataFrame, pd.Series, np.ndarray, list], height: float = 1, width: float = 7, ylimits: list = None, xlabel: str = 'Timestamp', ylabel: str | list = None, fig = None, axs = None) -> Tuple[matplotlib.figure.Figure, list]: 
->>>>>>> 6e4febcb05cc92ae2528ad59489a503fc5a19bca
+    for i, shut in enumerate(shutdowns):
+
+        if shut.size != 0:
+            for start,size in shut:
+                axs[i].axvspan(start,start+size,color='gray',alpha=0.5)
+
+def plot_multiple(data: Union[pd.DataFrame, pd.Series, np.ndarray, list], height: float = 1, width: float = 7, ylimits: list = None, xlabel: str = 'Timestamp', ylabel: str | list = None, fig = None, axs = None, same_limits=False, style=None, shutdowns=None, **kwargs) -> Tuple[matplotlib.figure.Figure, list]: 
     """ Creates a window with multiple plots alignes vertically.
 
         Parameters
@@ -213,14 +253,19 @@ def plot_multiple(data: Union[pd.DataFrame, pd.Series, np.ndarray, list], height
 
 
     if isinstance(data, pd.DataFrame):
-        fig, axs = _plot_multiple_dataframe(data,height,width,ylimits,xlabel,ylabel,fig,axs)
+        fig, axs = _plot_multiple_dataframe(data,height,width,ylimits,xlabel,ylabel,style,fig,axs, **kwargs)
     elif isinstance(data, pd.Series):
-        fig, axs = _plot_multiple_series(data,height,width,ylimits,xlabel,ylabel,fig,axs)
+        fig, axs = _plot_multiple_series(data,height,width,ylimits,xlabel,ylabel,style,fig,axs, **kwargs)
     elif isinstance(data, np.ndarray):
-        fig, axs = _plot_multiple_ndarray(data,height,width,ylimits,xlabel,ylabel,fig,axs)
+        fig, axs = _plot_multiple_ndarray(data,height,width,ylimits,xlabel,ylabel,style,fig,axs, **kwargs)
     elif isinstance(data, list):
-        fig, axs = _plot_multiple_list(data,height,width,ylimits,xlabel,ylabel,fig,axs)
+        fig, axs = _plot_multiple_list(data,height,width,ylimits,xlabel,ylabel,style,fig,axs,same_limits, **kwargs)
     else:
         return None, None
+    
+    if shutdowns is not None:
+       plot_shutdown(shutdowns,fig,axs)
 
     return fig, axs
+
+

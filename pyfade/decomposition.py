@@ -7,11 +7,7 @@ import pywt
 from typing import Literal, Tuple, Union, Any
 
 
-<<<<<<< HEAD
 def get_signal_decomp(data: Union[pd.DataFrame, pd.Series, np.ndarray], wavelet: str = 'haar', create_plot: bool = False, level: int = 1, height: float = 1, width: float = 7, **kwargs) -> Any:
-=======
-def get_signal_decomp(data: Union[pd.DataFrame, pd.Series, np.ndarray], wavelet: str = 'haar', create_plot: bool = False, level: int = 1, height: float = 1, width: float = 7) -> Any:
->>>>>>> 6e4febcb05cc92ae2528ad59489a503fc5a19bca
     """ Perform a multi-level discrete wavelet decomposition. Returns recomposed signals at each level and coefficients.
 
         Performs a multi-level discrete wavelet decompostion on a signal. Returns the resulting signal from each decomposition level (approximation and detail) and their respective coefficients.
@@ -59,7 +55,11 @@ def get_signal_decomp(data: Union[pd.DataFrame, pd.Series, np.ndarray], wavelet:
     elif isinstance(data,pd.DataFrame):
         values = data.values.T
         index = data.index
-        
+
+    style = kwargs.get('style','-b')
+    markersize = kwargs.get('markersize',2)
+    linewidth = kwargs.get('linewidth',1)
+
 
     # Creating variables
     decomp_sig = [None]*level
@@ -81,11 +81,7 @@ def get_signal_decomp(data: Union[pd.DataFrame, pd.Series, np.ndarray], wavelet:
         sig_D = pywt.waverec(coef_D, wavelet=wavelet)
 
         # Getting reconstructed index
-<<<<<<< HEAD
         if isinstance(data, np.ndarray) or not isinstance(index,pd.DatetimeIndex):
-=======
-        if isinstance(data, np.ndarray) or not isinstance(index,pd.Timestamp):
->>>>>>> 6e4febcb05cc92ae2528ad59489a503fc5a19bca
             new_ind_A = np.interp(np.linspace(0,1,sig_A.size),np.linspace(0,1,index.size),index)
             new_ind_D = np.interp(np.linspace(0,1,sig_D.size),np.linspace(0,1,index.size),index)
 
@@ -95,13 +91,8 @@ def get_signal_decomp(data: Union[pd.DataFrame, pd.Series, np.ndarray], wavelet:
 
         # Writing signal and coefficient
         decomp_sig[lvl] = [pd.Series(sig_A,index=new_ind_A), pd.Series(sig_D,index=new_ind_D)]
-<<<<<<< HEAD
         decomp_sig[lvl][0].name = f'Approximation {lvl+1}'
         decomp_sig[lvl][1].name = f'Detail {lvl+1}'
-=======
-        decomp_sig[lvl][0].name = f'Approximation {lvl}'
-        decomp_sig[lvl][1].name = f'Detail {lvl}'
->>>>>>> 6e4febcb05cc92ae2528ad59489a503fc5a19bca
         decomp_coef[lvl] = (cA, cD)
 
 
@@ -116,8 +107,8 @@ def get_signal_decomp(data: Union[pd.DataFrame, pd.Series, np.ndarray], wavelet:
         axs = [None]*num_plots
         axs[0] = plt.subplot(y_windows,1,1)
         axs[0].grid(True)
-        axs[0].plot(index,values[0,:])
-        axs[0].set_ylabel('Original')
+        axs[0].plot(index,values[0,:],style,markersize=markersize,linewidth=linewidth)
+        axs[0].set_ylabel('Original data')
 
         # Plot each level
         for lvl in range(level):
@@ -128,14 +119,14 @@ def get_signal_decomp(data: Union[pd.DataFrame, pd.Series, np.ndarray], wavelet:
             if isinstance(data, np.ndarray):
                 ind = decomp_sig[lvl][0][0]
                 sig = decomp_sig[lvl][0][1]
-                ax.plot(ind,sig)
+                ax.plot(ind,sig,style,markersize=markersize,linewidth=linewidth)
                 ax.grid(True)
-                ax.set_ylabel(f'Level {lvl+1}')
+                ax.set_ylabel(f'Approximation {lvl+1}')
             else:
                 sig = decomp_sig[lvl][0]
-                ax.plot(sig)
+                ax.plot(sig,style,markersize=markersize,linewidth=linewidth)
                 ax.grid(True)
-                ax.set_ylabel(f'Level {lvl+1}')
+                ax.set_ylabel(f'Approximation {lvl+1}')
 
             # Detail
             ax = plt.subplot(y_windows,2,2*(lvl+2))
@@ -143,12 +134,14 @@ def get_signal_decomp(data: Union[pd.DataFrame, pd.Series, np.ndarray], wavelet:
             if isinstance(data, np.ndarray):
                 ind = decomp_sig[lvl][1][0]
                 sig = decomp_sig[lvl][1][1]
-                ax.plot(ind,sig)
+                ax.plot(ind,sig,style,markersize=markersize,linewidth=linewidth)
                 ax.grid(True)
+                ax.set_ylabel(f'Detail {lvl+1}')
             else:
                 sig = decomp_sig[lvl][1]
-                ax.plot(sig)
+                ax.plot(sig,style,markersize=markersize,linewidth=linewidth)
                 ax.grid(True)
+                ax.set_ylabel(f'Detail {lvl+1}')
 
 
     return decomp_sig, decomp_coef
