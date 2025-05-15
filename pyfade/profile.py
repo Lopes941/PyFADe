@@ -14,7 +14,7 @@ from typing import Union, Any
 from .plot import plot_multiple
 from .decomposition import get_signal_decomp
 from .models import znormalize
-from .core.mprofile import get_matrix_profile
+from .mprofile import get_matrix_profile
 
 def wavelet_MP_from_KDP(data: Union[pd.DataFrame, pd.Series], subseq_size: int, dimension: int, **kwargs) -> pd.DataFrame:
 
