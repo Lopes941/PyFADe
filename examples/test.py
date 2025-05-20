@@ -1,15 +1,20 @@
-import pyfade
+import pyfade as p
 import numpy as np
-from time import perf_counter
-import matplotlib.pyplot as plt
-
-c = pyfade.get_matrix_profile(np.ones(100),10,0,0)[:,0]
+from matplotlib import pyplot as plt
 
 
-print(c)
+# series = np.array([1,2,5,7,1,2,6,7])
+N = 1<<10
 
+x = np.linspace(0,100,N)
+series = np.sin(x)
 
-plt.plot(c)
+a = p.mat_profile.Mat_Profile(series,30)
+
+a.run_batch()
+
+plt.plot(a.series)
+plt.figure()
+plt.plot(a.mp)
+
 plt.show()
-
-plt.grid(True)
