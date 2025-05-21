@@ -1,17 +1,13 @@
-import pyfade
+import pyfade as p
 import numpy as np
-from time import perf_counter
-import matplotlib.pyplot as plt
+from matplotlib import pyplot as plt
 
 
+anom_signal = np.array([1,2,3,2,1])
+SUBSEQ_SIZE = 2
+a = p.mat_profile.Mat_Profile(anom_signal,SUBSEQ_SIZE)
 
-c = pyfade.get_matrix_profile(a,10,'both')[:,0]
+a.run_batch()
 
-
-print(c)
-
-
-plt.plot(c)
-plt.show()
-
-plt.grid(True)
+print(a.mp)
+print(a.ind)
