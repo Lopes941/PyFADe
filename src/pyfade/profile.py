@@ -14,7 +14,7 @@ from typing import Union, Any
 from .plot import plot_multiple
 from .decomposition import get_signal_decomp
 from .models import znormalize
-#from .mprofile import get_matrix_profile
+from .mat_profile import Mat_Profile
 
 def wavelet_MP_from_KDP(data: Union[pd.DataFrame, pd.Series], subseq_size: int, dimension: int, **kwargs) -> pd.DataFrame:
 
@@ -245,7 +245,7 @@ def get_MP_from_wavelets(data: Union[pd.DataFrame, pd.Series], subseq_size: int,
 
     return MPs, None
 
-def get_MP(data: Union[pd.DataFrame, pd.Series, np.ndarray, list], subseq_size: int, quantile: float = 0., ignore_extremes: bool = True, shutdown: np.ndarray = None, skip_start: int=100, only_left: bool=False,**kwargs) -> list:
+def get_MP(data: Union[pd.DataFrame, pd.Series, np.ndarray, list], subseq_size: int, quantile: float = 0., shutdown: np.ndarray = None, skip_start: int=100, only_left: bool=False,**kwargs) -> list:
     """ Returns the matrix profile of each dimension of a time series.
 
         Returns the matrix profile of a time series. The matrix profile is defined by Prof. Eamon Keogh as the minimum distance profile for each subsequence in a time series. It is calculated here via the stumpy library.
@@ -315,8 +315,13 @@ def get_MP(data: Union[pd.DataFrame, pd.Series, np.ndarray, list], subseq_size: 
             val = values[k,:]
 
         # Calculating MP
-        normalize = kwargs.get('normalize',True)
-        mp = get_matrix_profile(val,subseq_size,skip_start,only_left)
+        mp_class = Mat_Profile(val,subseq_size)
+        mp_class.set_start_ignore(skip_start)
+        mp_class.set_left_only(only_left)
+        mp_class.run_batch()
+
+        mp = np.array(mp_class.mp)
+        mp_ind = np.array(mp_class.ind)
         
 
         # Removing shutdown indexes
@@ -325,20 +330,15 @@ def get_MP(data: Union[pd.DataFrame, pd.Series, np.ndarray, list], subseq_size: 
                 start = shutdown[:,0]
                 end = shutdown[:,0]+shutdown[:,1]
 
-                mp[np.array([np.any((ind >= start) & (ind < end)) for ind in index]),0] = 0
+                mp[np.array([np.any((ind >= start) & (ind < end)) for ind in index])] = 0
 
-        # Removing start
-        if ignore_extremes:
-            mp[:subseq_size,0] = 0
-            mp[-subseq_size:,0] = 0
-        
         # Removing quantile
         if quantile != 0.:
 
-            mp[:,0] -= np.quantile(mp[:,0],quantile)
-            mp[:,0][mp[:,0]<0] = 0
+            mp -= np.quantile(mp,quantile)
+            mp[mp<0] = 0
 
-        MP[k] = pd.DataFrame(data={f'{name[k]}': mp[:,0], 'match': mp[:,1]}, index=index)
+        MP[k] = pd.DataFrame(data={f'{name[k]}': mp, 'match':mp_ind}, index=index)
 
     return MP
 

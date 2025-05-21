@@ -1,5 +1,7 @@
 #include <pybind11/pybind11.h>
+#include <pybind11/numpy.h>
 #include <pybind11/stl.h>
+#include <vector>
 
 #include "cpp/mprofile.h"
 
@@ -13,14 +15,44 @@ PYBIND11_MODULE(mat_profile, handle) {
         .def(py::init<const std::vector<double>>())
         .def(py::init<const std::vector<double>, size_t>())
 
-        .def_property_readonly("means", &cfade::Mat_Profile::get_means)
-        .def_property_readonly("stds", &cfade::Mat_Profile::get_stds)
-        .def_property_readonly("series", &cfade::Mat_Profile::get_series)
-        .def_property_readonly("mp", &cfade::Mat_Profile::get_mp)
-        .def_property_readonly("ind", &cfade::Mat_Profile::get_mp_ind)
+        .def_property_readonly("size", &cfade::Mat_Profile::get_size)
+        .def_property_readonly("means", [](const cfade::Mat_Profile &self){
+                                const std::vector<double>& vec = self.get_means();
+                                return py::array(vec.size(),vec.data());
+                            })
 
-        .def("return_size", &cfade::Mat_Profile::return_size)
+        .def_property_readonly("stds", [](const cfade::Mat_Profile &self){
+                                const std::vector<double>& vec = self.get_stds();
+                                return py::array(vec.size(),vec.data());
+                            })
+
+
+        .def_property_readonly("series", [](const cfade::Mat_Profile &self){
+                                const std::vector<double>& vec = self.get_series();
+                                return py::array(vec.size(),vec.data());
+                            })
+
+        .def_property_readonly("mp", [](const cfade::Mat_Profile &self){
+                                const std::vector<double>& vec = self.get_mp();
+                                return py::array(vec.size(),vec.data());
+                            })
+
+        .def_property_readonly("ind", [](const cfade::Mat_Profile &self){
+                                const std::vector<int>& vec = self.get_mp_ind();
+                                return py::array(vec.size(),vec.data());
+                            })
+
+        .def_property_readonly("qt", [](const cfade::Mat_Profile &self){
+                                const std::vector<double>& vec = self.get_QT();
+                                return py::array(vec.size(),vec.data());
+                            })
+
+
         .def("set_interval_size", &cfade::Mat_Profile::set_interval_size)
+        .def("set_exclusion_ratio", &cfade::Mat_Profile::set_exclusion_ratio)
+        .def("set_start_ignore", &cfade::Mat_Profile::set_start_ignore)
+        .def("set_left_only", &cfade::Mat_Profile::set_left_only)
+
         .def("run_batch", &cfade::Mat_Profile::run_batch);
         
 }
