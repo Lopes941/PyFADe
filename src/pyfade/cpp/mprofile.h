@@ -1,7 +1,6 @@
 #pragma once
 
 #include <vector>
-#include <cuda_runtime.h>
 
 namespace cfade
 {
@@ -12,6 +11,7 @@ namespace cfade
 
         bool left_only=true;
         bool started_runtime=false;
+        bool use_cuda=false;
 
         int skip_start=0;
 
@@ -68,16 +68,17 @@ namespace cfade
         std::vector<double> get_stds() const;
 
         // CUDA operations
+        void set_cuda(bool);
         void initialize_cuda();
         void release_from_cuda();
-        void get_first_product(int start);
-
 
         
         // Run operations
         void run_batch();
         void init_runtime();
         void stop_runtime();
+        void get_first_product(int start);
+        void run_iterations();
 
         // Including data
         void append_data(std::vector<double>);

@@ -32,7 +32,7 @@ wavelet = 'db2'
 
 sub_size = 7*24
 ti = perf_counter()
-MPs = pyfade.wavelet_MP_from_KDP(sub_data,sub_size,3,level=3,wavelet=wavelet,ignore_start=True, quantile=0.75, on_signals=True,create_plot=True,plot_data=True)
+MPs = pyfade.wavelet_MP_from_KDP(sub_data,sub_size,3,level=3,wavelet=wavelet,ignore_start=True, quantile=0.75, on_signals=True,create_plot=True,plot_data=True,use_cuda=True)
 fig, axs = pyfade.plot_multiple(MPs);
 to = perf_counter() -ti
 print(f'Time: {to:0.2f} s')

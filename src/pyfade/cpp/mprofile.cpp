@@ -1,10 +1,14 @@
-
 #include "mprofile.h"
-#include "cuda_funcs.h"
+#include "cpu_funcs.h"
 
 #include <iostream>
 #include <numeric>
+
+// #ifdef USE_CUDA
+#include "cuda_funcs.h"
 #include <cufft.h>
+#include <cuda_runtime.h>
+// #endif
 
 
 namespace cfade{
@@ -23,15 +27,22 @@ namespace cfade{
 
     // Default destructor
     Mat_Profile::~Mat_Profile(){
-        if (d_series) cudaFree(d_series);
-        if (d_means) cudaFree(d_means);
-        if (d_stds) cudaFree(d_stds);
-        if (d_QT) cudaFree(d_QT);
 
-        d_series = nullptr;
-        d_means = nullptr;
-        d_stds = nullptr;
-        d_QT = nullptr;
+        // #ifdef USE_CUDA
+        // if(use_cuda){
+            if (d_series) cudaFree(d_series);
+            if (d_means) cudaFree(d_means);
+            if (d_stds) cudaFree(d_stds);
+            if (d_QT) cudaFree(d_QT);
+
+            d_series = nullptr;
+            d_means = nullptr;
+            d_stds = nullptr;
+            d_QT = nullptr;
+            return;
+        // }
+        // #endif
+
     }
 
     // Setter for interval size
@@ -96,33 +107,38 @@ namespace cfade{
         return QT;
     }
 
+    // Setter for cuda parameter
+    void Mat_Profile::set_cuda(bool use_cuda_){
+        // #ifdef USE_CUDA
+        use_cuda = use_cuda_;
+        return;
+        // #endif
+        throw std::runtime_error("Cannot start CUDA. CUDA_PATH not found.");
+    }
     // Initialization of CUDA pointers
     void Mat_Profile::initialize_cuda(){
 
         started_runtime = true;
-        // cudaMalloc((void**) &d_ind, mp_size * sizeof(int));
-        // cudaMalloc((void**) &d_mp, mp_size * sizeof(double));
-        cudaMalloc((void**) &d_series, series.size() * sizeof(double));
-        cudaMalloc((void**) &d_means, means.size() * sizeof(double));
-        cudaMalloc((void**) &d_stds, stds.size() * sizeof(double));
-        cudaMalloc((void**) &d_QT, sizeof(double)* mp_size);
-        
+        // #ifdef USE_CUDA
+        // if(use_cuda){
+            cudaMalloc((void**) &d_series, series.size() * sizeof(double));
+            cudaMalloc((void**) &d_means, means.size() * sizeof(double));
+            cudaMalloc((void**) &d_stds, stds.size() * sizeof(double));
+            cudaMalloc((void**) &d_QT, sizeof(double)* mp_size);
+            
 
-        cudaMemcpy(d_series, series.data(), series.size() * sizeof(double), cudaMemcpyHostToDevice );
-        cudaMemcpy(d_means, means.data(), means.size() * sizeof(double), cudaMemcpyHostToDevice );
-        cudaMemcpy(d_stds, stds.data(), stds.size() * sizeof(double), cudaMemcpyHostToDevice );
+            cudaMemcpy(d_series, series.data(), series.size() * sizeof(double), cudaMemcpyHostToDevice );
+            cudaMemcpy(d_means, means.data(), means.size() * sizeof(double), cudaMemcpyHostToDevice );
+            cudaMemcpy(d_stds, stds.data(), stds.size() * sizeof(double), cudaMemcpyHostToDevice );
 
-        if(mat_profile.size()>0){
-            // cudaMemcpy(d_mp, mat_profile.data(), mp_size * sizeof(double), cudaMemcpyHostToDevice );
-            cudaMemcpy(d_QT, QT.data(), mp_size * sizeof(double), cudaMemcpyHostToDevice );
-            // cudaMemcpy(d_ind, mp_index.data(), mp_size * sizeof(int), cudaMemcpyHostToDevice );
-        }else{
-            // cudaMemset(d_mp, 0, mp_size* sizeof(double));
-            cudaMemset(d_QT, 0, mp_size* sizeof(double));
-            // cudaMemset(d_ind, -1, mp_size* sizeof(int));
-        }
-
-        
+            if(mat_profile.size()>0){
+                cudaMemcpy(d_QT, QT.data(), mp_size * sizeof(double), cudaMemcpyHostToDevice );
+            }else{
+                cudaMemset(d_QT, 0, mp_size* sizeof(double));
+            }
+            return;
+        // }
+        // #endif
         
 
     }
@@ -132,23 +148,26 @@ namespace cfade{
 
         started_runtime = false;
 
-        QT = std::vector<double>(mp_size);
+        // #ifdef USE_CUDA
+        // if(use_cuda){
+            QT = std::vector<double>(mp_size);
+            cudaMemcpy(QT.data(), d_QT, mp_size * sizeof(double), cudaMemcpyDeviceToHost );
 
-        cudaMemcpy(QT.data(), d_QT, mp_size * sizeof(double), cudaMemcpyDeviceToHost );
+            if (d_series) cudaFree(d_series);
+            if (d_means) cudaFree(d_means);
+            if (d_stds) cudaFree(d_stds);
+            if (d_QT) cudaFree(d_QT);
 
-
-        if (d_series) cudaFree(d_series);
-        if (d_means) cudaFree(d_means);
-        if (d_stds) cudaFree(d_stds);
-        if (d_QT) cudaFree(d_QT);
-
-        d_series = nullptr;
-        d_means = nullptr;
-        d_stds = nullptr;
-        d_QT = nullptr;
+            d_series = nullptr;
+            d_means = nullptr;
+            d_stds = nullptr;
+            d_QT = nullptr;
+            return;
+        // }
+        // #endif
     }
 
-    // Calculation of first dot product via CuFFT
+    // Calculation of first dot product via FFT
     void Mat_Profile::get_first_product(int start){
 
         // Getting flipped first interval padded
@@ -162,48 +181,42 @@ namespace cfade{
         std::vector<double> series_padded(padded_size,0.0f);
         std::copy(series.begin(), series.end(), series_padded.begin());
 
-        // Passing stuff to device
-        double *d_Q, *d_series_padded, *d_QT_padded;
-        cufftDoubleComplex *d_fft_series, *d_fft_Q;
-
-        cudaMalloc(&d_series_padded, sizeof(double)*padded_size);
-        cudaMalloc(&d_Q, sizeof(double)*padded_size);
-        cudaMalloc(&d_QT_padded, sizeof(double)*padded_size);
-    
-        int fft_size = padded_size/2+1;
-        cudaMalloc(&d_fft_series, sizeof(cufftDoubleComplex) * fft_size);
-        cudaMalloc(&d_fft_Q, sizeof(cufftDoubleComplex) * fft_size);
-
-        cudaMemcpy(d_series_padded,series_padded.data(), sizeof(double)*padded_size, cudaMemcpyHostToDevice);
-        cudaMemcpy(d_Q,Q_padded.data(), sizeof(double)*padded_size, cudaMemcpyHostToDevice);
+        // #ifdef USE_CUDA
+        if(use_cuda){
+            cuda_convolve(d_QT, series_padded.data(), Q_padded.data(), padded_size, interval_size,mp_size);
+            return;
+        }
+        // #endif
+        QT = std::vector<double>(mp_size);
+        cpu_convolve(QT.data(),series_padded.data(),Q_padded.data(),padded_size,interval_size,mp_size);
 
 
-        // Running FFT
-        cufftHandle plan_fft_series, plan_fft_Q;
-        cufftPlan1d(&plan_fft_series, padded_size, CUFFT_D2Z, 1);
-        cufftPlan1d(&plan_fft_Q, padded_size, CUFFT_D2Z, 1);
-        cufftExecD2Z(plan_fft_series, d_series_padded, d_fft_series);
-        cufftExecD2Z(plan_fft_Q, d_Q, d_fft_Q);
+        cudaMemcpy(d_QT, QT.data(), mp_size * sizeof(double), cudaMemcpyHostToDevice );
+        
 
-        // Multiplication
-        launch_multiply_complex(d_fft_series, d_fft_Q, fft_size);
-
-        // Inverse FFT
-        cufftHandle plan_ifft;
-        cufftPlan1d(&plan_ifft, padded_size, CUFFT_Z2D, 1);
-        cufftExecZ2D(plan_ifft, d_fft_series, d_QT_padded);
-        launch_iff_normalization(d_QT_padded, padded_size);
-        cudaMemcpy(d_QT, d_QT_padded+interval_size-1, mp_size * sizeof(double), cudaMemcpyDeviceToDevice );
-
-
-        cufftDestroy(plan_fft_series);
-        cufftDestroy(plan_fft_Q);
-        cufftDestroy(plan_ifft);
-
-        cudaFree(d_series_padded);
-        cudaFree(d_fft_series);
-        cudaFree(d_fft_Q);
-        cudaFree(d_QT_padded);
+        
+    }
+ 
+    // Calculation of iterations
+    void Mat_Profile::run_iterations(){
+        // #ifdef USE_CUDA
+        // if(use_cuda){
+            cuda_STOMP_iterations(d_series, 
+                            d_QT,
+                            d_means, 
+                            d_stds, 
+                            mat_profile.data(), 
+                            mp_index.data(), 
+                            current_QT_location, 
+                            mp_size, 
+                            interval_size,
+                            exclusion_zone_size,
+                            left_only);
+            return;
+        // }
+        // #endif
+        // TODO: CPU Update
+        throw std::runtime_error("CPU STOMP not implemented");
     }
 
     // Starting runtime operations
@@ -253,23 +266,20 @@ namespace cfade{
 
 
         // Running iterations
-        launch_STOMP_iterations(d_series, 
-                        d_QT,
-                        d_means, 
-                        d_stds, 
-                        mat_profile.data(), 
-                        mp_index.data(), 
-                        current_QT_location, 
-                        mp_size, 
-                        interval_size,
-                        exclusion_zone_size,
-                        left_only);
+        run_iterations();
+        
 
         // Removing start
         if(mp_size>skip_start){
             for(int i=0; i<skip_start; i++){
                 mat_profile[i] = 0;
             }
+
+            for(int i=skip_start; i<mp_size; i++){
+                if(mp_index[i]>=0)
+                mat_profile[i] = std::max(mat_profile[mp_index[i]],mat_profile[i]);
+            }
+
         }
 
 
@@ -277,8 +287,12 @@ namespace cfade{
         if(started_here){
             release_from_cuda();
         }else{
-            QT = std::vector<double>(mp_size);
-            cudaMemcpy(QT.data(), d_QT, mp_size * sizeof(double), cudaMemcpyDeviceToHost );
+            #ifdef USE_CUDA
+            if(use_cuda){
+                QT = std::vector<double>(mp_size);
+                cudaMemcpy(QT.data(), d_QT, mp_size * sizeof(double), cudaMemcpyDeviceToHost );
+            }
+            #endif
         }
         
 

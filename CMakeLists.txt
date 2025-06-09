@@ -1,21 +1,71 @@
 cmake_minimum_required(VERSION 3.15...3.26)
-project(pyfade LANGUAGES CXX CUDA)
+project(pyfade LANGUAGES CXX)
+
+# Enable CUDA if available
+enable_language(CUDA OPTIONAL)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 
-set(PYBIND11_FINDPYTHON ON)
 find_package(Python COMPONENTS Interpreter Development REQUIRED)
 find_package(pybind11 CONFIG REQUIRED)
-find_package(CUDAToolkit REQUIRED)
 
+# # Trying to find CUDA
+# find_package(CUDAToolkit QUIET)
 
-pybind11_add_module(mat_profile 
-    src/pyfade/cpp/mprofile.cpp
+# if (DEFINED CUDAToolkit_ROOT)
+#     message(STATUS "CUDA found: Enabling GPU acceleration 1 ${CUDAToolkit_ROOT}")
+#     set(RESOLVED_CUDA_PATH "${CUDAToolkit_ROOT}")
+#     add_definitions(-DUSE_CUDA)
+#     set(HAS_CUDA TRUE)
+# elseif(DEFINED CUDA_PATH)
+#     message(STATUS "CUDA found: Enabling GPU acceleration 2 ${CUDA_PATH}")
+#     set(RESOLVED_CUDA_PATH "${CUDA_PATH}")
+#     add_definitions(-DUSE_CUDA)
+#     set(HAS_CUDA TRUE)
+# elseif (CUDAToolkit_FOUND)
+#     get_target_property(CUDART_LOCATION CUDA::cudart IMPORTED_LOCATION)
+#     get_filename_component(CUDA_LIB_DIR "${CUDART_LOCATION}" DIRECTORY)
+#     get_filename_component(CUDA_LIB_PARENT "${CUDA_LIB_DIR}" DIRECTORY)
+#     get_filename_component(CUDA_TOOLKIT_ROOT "${CUDA_LIB_PARENT}" DIRECTORY)
+#     message(STATUS "CUDA found: Enabling GPU acceleration 3 ${CUDA_TOOLKIT_ROOT}")
+#     set(RESOLVED_CUDA_PATH "${CUDA_TOOLKIT_ROOT}")
+#     add_definitions(-DUSE_CUDA)
+#     set(HAS_CUDA TRUE)
+# else()
+#     message(STATUS "CUDA not found: Building CPU-only version")
+#     set(RESOLVED_CUDA_PATH "")
+#     set(HAS_CUDA FALSE)
+# endif()
+
+# Write the path to a Python file inside the package
+file(WRITE "${CMAKE_CURRENT_BINARY_DIR}/cuda_config.py"
+     "cuda_path = r'${RESOLVED_CUDA_PATH}'\n")
+
+     
+# Install the config file into the module directory
+install(FILES "${CMAKE_CURRENT_BINARY_DIR}/cuda_config.py"
+        DESTINATION pyfade)
+
+# file(GLOB CPP_SOURCES src/pyfade/bindings/*.cpp)
+
+set(SOURCE_FILES
     src/pyfade/bindings.cpp
-    src/pyfade/cpp/cuda_funcs.cu)
+    src/pyfade/cpp/dataset.cpp
+    src/pyfade/cpp/statistics.cpp
+    # src/pyfade/cpp/matrix_profile.cpp
+    )
 
+# if (HAS_CUDA)
+#     list(APPEND SOURCE_FILES src/pyfade/cpp/cuda_funcs.cu)
+# endif()
 
-target_link_libraries(mat_profile PRIVATE CUDA::cufft CUDA::cudart)
-install(TARGETS mat_profile LIBRARY DESTINATION pyfade)
+pybind11_add_module(core ${SOURCE_FILES})
+
+# if (HAS_CUDA)
+#     target_link_libraries(core PRIVATE CUDA::cufft CUDA::cudart)
+# endif()
+
+target_include_directories(core PRIVATE ${PROJECT_SOURCE_DIR}/src/pyfade)
+install(TARGETS core LIBRARY DESTINATION pyfade)

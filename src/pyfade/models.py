@@ -12,14 +12,6 @@ import pywt
 
 from typing import Literal, Tuple, Union, Any
 
-#TODO Write ARIMA and ARIMAX functions here
-def get_arima(data: Union[pd.DataFrame, pd.Series, np.ndarray], order: Any):
-
-   # model = ARIMA(order=order, with_intercept=True, )
-
-    return None
-
-
 def znormalize(data: Union[pd.DataFrame, pd.Series, np.ndarray]) -> Union[pd.DataFrame, pd.Series, np.ndarray]:
     """ Returns the z-normalized time series.
 

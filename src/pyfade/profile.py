@@ -176,7 +176,7 @@ def get_MP_from_wavelets(data: Union[pd.DataFrame, pd.Series], subseq_size: int,
         # Approximation Matrix Profile
         cur_sig = signals[level-1][0]
 
-        MPs[level] = get_MP(cur_sig,subseq_size,normalize=False,**kwargs)[0]
+        MPs[level] = get_MP(cur_sig,subseq_size,normalize=False,**kwargs)[0]* np.std(cur_sig)
         MPs[level].name = f'Level {level+1}'
         if plot_data:
             data_plot[level] = cur_sig
@@ -245,7 +245,7 @@ def get_MP_from_wavelets(data: Union[pd.DataFrame, pd.Series], subseq_size: int,
 
     return MPs, None
 
-def get_MP(data: Union[pd.DataFrame, pd.Series, np.ndarray, list], subseq_size: int, quantile: float = 0., shutdown: np.ndarray = None, skip_start: int=100, only_left: bool=False,**kwargs) -> list:
+def get_MP(data: Union[pd.DataFrame, pd.Series, np.ndarray, list], subseq_size: int, quantile: float = 0., shutdown: np.ndarray = None, skip_start: int=100, only_left: bool=False, use_cuda=False,**kwargs) -> list:
     """ Returns the matrix profile of each dimension of a time series.
 
         Returns the matrix profile of a time series. The matrix profile is defined by Prof. Eamon Keogh as the minimum distance profile for each subsequence in a time series. It is calculated here via the stumpy library.
@@ -318,6 +318,7 @@ def get_MP(data: Union[pd.DataFrame, pd.Series, np.ndarray, list], subseq_size: 
         mp_class = Mat_Profile(val,subseq_size)
         mp_class.set_start_ignore(skip_start)
         mp_class.set_left_only(only_left)
+        mp_class.set_cuda(use_cuda)
         mp_class.run_batch()
 
         mp = np.array(mp_class.mp)

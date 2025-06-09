@@ -1,5 +1,10 @@
+
+#include <cpp/dataset.h>
+#include <cpp/matrix_profile.h>
 #include "cuda_funcs.h"
 #include <iostream>
+#include <memory>
+
     // ==========================
     //  Kernels
     // ==========================
@@ -135,123 +140,204 @@ __global__ void fill_int(int* d_arr, int var, int size){
 //  LAUNCH FUNCTIONS
 // ==========================
 
+// Number of blocks
+void choose_cuda_parameters(int total_size,
+                            int &num_blocks,
+                            int &num_threads){
+    
+    // Getting GPU properties
+    cudaDeviceProp prop;
+    cudaGetDeviceProperties(&prop,0);
 
-void launch_multiply_complex(cufftDoubleComplex* d_fft_series, 
-                                const cufftDoubleComplex* d_fft_kernel, 
-                                int fft_size){
+    // Choosing number of threads
+    num_threads = 256;
+    if (num_threads > prop.maxThreadsPerBlock)
+        num_threads = prop.maxThreadsPerBlock;
 
-    const int threads = 256;
-    const int blocks = (fft_size + threads - 1) / threads;
-    multiply_complex<<<blocks, threads>>>(d_fft_series, d_fft_kernel, fft_size);
+    // Computing number of blocks
+    num_blocks = static_cast<int>((total_size+num_threads-1)/num_threads);
 
 }
-
-void launch_iff_normalization(double* data, 
-                            int size){
-
-    const int threads = 256;
-    const int blocks = (size + threads - 1) / threads;
-    normalize_ifft<<<blocks, threads>>>(data, size);
-
-}
-
 
 // Launching STOMP
-void launch_STOMP_iterations(const double* series, 
+void cuda_STOMP_iterations(const std::shared_ptr<cfade::DataSet> observed_dataset,
+                        const std::shared_ptr<cfade::VectorGroup<double>> means,
+                        const std::shared_ptr<cfade::VectorGroup<double>> stds,
                         double* QT,
-                        const double* means, 
-                        const double* stds, 
-                        double* MP, 
-                        int* inds_MP,
-                        int &current_QT_location, 
+                        std::shared_ptr<cfade::VectorGroup<double>> MP, 
+                        std::shared_ptr<cfade::VectorGroup<int>> inds_MP,
+                        int start_location, 
                         const int final_size, 
                         const int interval_size,
                         const int exclusion_zone_size,
                         const bool left_only){
 
-    const int threads = 256;
-    const int blocks = (final_size + threads - 1) / threads;
-    double* QT_first, *QT_2;
+    int threads;
+    int blocks;
+
+    choose_cuda_parameters(final_size,blocks,threads);
+    double* QT_first, *QT_even, *QT_odd;
+    double *d_mean, *d_series, *d_stds;
     double *D;
     int *I;
 
-    int start_location = current_QT_location;
-    int number_of_updates = final_size-current_QT_location;
-    int current_update = 0;
+    int number_of_updates = final_size-start_location;
+
 
     cudaMalloc(&D, sizeof(double)*number_of_updates);
     cudaMalloc(&I, sizeof(int)*number_of_updates);
+    cudaMalloc((void**) &QT_first, sizeof(double)* final_size);
+    cudaMalloc((void**) &QT_even, sizeof(double)* final_size);
+    cudaMalloc((void**) &QT_odd, sizeof(double)* final_size);
+    cudaMalloc((void**) &d_mean, sizeof(double)* final_size);
+    cudaMalloc((void**) &d_series, sizeof(double)* observed_dataset->get_size());
+    cudaMalloc((void**) &d_stds, sizeof(double)* final_size);
 
-    fill_double<<<blocks,threads>>>(D,-1,number_of_updates);
-    fill_int<<<blocks,threads>>>(I,-1,number_of_updates);
-    
+    for(int dimension = 0; dimension<observed_dataset->get_dimension();dimension++){
 
-    // Getting first QT if iteration 0
-    if (current_QT_location==0){
-                
-        distance_profile<<<blocks, threads>>>(series,
+        std::vector<double> series_vec = (observed_dataset->get_data())[dimension];
+        std::vector<double> mean_vec = (*means)[dimension];
+        std::vector<double> std_vec = (*stds)[dimension];
+
+        cudaMemcpy(d_mean, mean_vec.data(), final_size * sizeof(double), cudaMemcpyDeviceToDevice );
+        cudaMemcpy(d_stds, std_vec.data(), final_size * sizeof(double), cudaMemcpyDeviceToDevice );
+        cudaMemcpy(d_series, series_vec.data(), observed_dataset->get_size() * sizeof(double), cudaMemcpyDeviceToDevice );
+
+        fill_double<<<blocks,threads>>>(D,-1,number_of_updates);
+        fill_int<<<blocks,threads>>>(I,-1,number_of_updates);
+
+        int current_update = 0;
+
+        distance_profile<<<blocks, threads>>>(d_series,
                                             QT,
-                                            means,
-                                            stds,
+                                            d_mean,
+                                            d_stds,
                                             D+current_update,
                                             I+current_update,
-                                            current_QT_location,
+                                            start_location+current_update,
                                             final_size,
                                             interval_size,
                                             exclusion_zone_size,
                                             left_only);
-        current_QT_location++;
         current_update++;
-    }
 
-    cudaMalloc((void**) &QT_first, sizeof(double)* final_size);
-    cudaMalloc((void**) &QT_2, sizeof(double)* final_size);
+        cudaMemcpy(QT_first, QT, final_size * sizeof(double), cudaMemcpyDeviceToDevice );
+        cudaMemcpy(QT_odd, QT+dimension*final_size,final_size * sizeof(double), cudaMemcpyDeviceToDevice );
 
-    cudaMemcpy(QT_first, QT, final_size * sizeof(double), cudaMemcpyDeviceToDevice );
-    cudaMemcpy(QT_2, QT, final_size * sizeof(double), cudaMemcpyDeviceToDevice );
-
-    for(current_QT_location; current_QT_location<final_size;current_QT_location++){
-        if (current_QT_location%2){
-            stomp_iteration<<<blocks, threads>>>(series,
-                                QT_2,
-                                QT,
-                                means,
-                                stds,
-                                D+current_update,
-                                I+current_update,
-                                QT_first,
-                                current_QT_location,
-                                final_size,
-                                interval_size,
-                                exclusion_zone_size,
-                                left_only);
-        }else{
-            stomp_iteration<<<blocks, threads>>>(series,
-                                QT,
-                                QT_2,
-                                means,
-                                stds,
-                                D+current_update,
-                                I+current_update,
-                                QT_first,
-                                current_QT_location,
-                                final_size,
-                                interval_size,
-                                exclusion_zone_size,
-                                left_only);
+        for(current_update; current_update<number_of_updates;current_update++){
+            if (current_update%2){
+                stomp_iteration<<<blocks, threads>>>(d_series,
+                                    QT_even,
+                                    QT_odd,
+                                    d_mean,
+                                    d_stds,
+                                    D+current_update,
+                                    I+current_update,
+                                    QT_first,
+                                    start_location+current_update,
+                                    final_size,
+                                    interval_size,
+                                    exclusion_zone_size,
+                                    left_only);
+            }else{
+                stomp_iteration<<<blocks, threads>>>(d_series,
+                                    QT_odd,
+                                    QT_even,
+                                    d_mean,
+                                    d_stds,
+                                    D+current_update,
+                                    I+current_update,
+                                    QT_first,
+                                    start_location+current_update,
+                                    final_size,
+                                    interval_size,
+                                    exclusion_zone_size,
+                                    left_only);
+            }
+            current_update++;
         }
-        current_update++;
+
+        std::vector<double> matrix_profile_vec(number_of_updates);
+        std::vector<int> matrix_index_vec(number_of_updates);
+
+        cudaMemcpy(matrix_profile_vec.data(), D, sizeof(double)*number_of_updates, cudaMemcpyDeviceToHost);
+        cudaMemcpy(matrix_index_vec.data(), I, sizeof(int)*number_of_updates, cudaMemcpyDeviceToHost);
+
+        for(int j=0;j<number_of_updates;j++){
+            MP->at(dimension,j+start_location) = matrix_profile_vec[j];
+            inds_MP->at(dimension,j+start_location) = matrix_index_vec[j];
+        }
     }
 
-    cudaMemcpy(MP+start_location, D, sizeof(double)*number_of_updates, cudaMemcpyDeviceToHost);
-    cudaMemcpy(inds_MP+start_location, I, sizeof(int)*number_of_updates, cudaMemcpyDeviceToHost);
-
-
-
+    cudaFree(d_mean);
+    cudaFree(d_stds);
+    cudaFree(d_series);
     cudaFree(QT_first);
-    cudaFree(QT_2);
+    cudaFree(QT_odd);
+    cudaFree(QT_even);
     cudaFree(D);
     cudaFree(I);
 
+}
+
+void cuda_convolve(double* d_QT, 
+                const double* series_padded, 
+                const double* Q_padded, 
+                const int padded_size,
+                const int interval_size,
+                const int mp_size){
+
+
+    int threads;
+
+    // Passing stuff to device
+    double *d_Q, *d_series_padded, *d_QT_padded;
+    cufftDoubleComplex *d_fft_series, *d_fft_Q;
+
+    cudaMalloc(&d_series_padded, sizeof(double)*padded_size);
+    cudaMalloc(&d_Q, sizeof(double)*padded_size);
+    cudaMalloc(&d_QT_padded, sizeof(double)*padded_size);
+
+    int fft_size = padded_size/2+1;
+    cudaMalloc(&d_fft_series, sizeof(cufftDoubleComplex) * fft_size);
+    cudaMalloc(&d_fft_Q, sizeof(cufftDoubleComplex) * fft_size);
+
+    cudaMemcpy(d_series_padded,series_padded, sizeof(double)*padded_size, cudaMemcpyHostToDevice);
+    cudaMemcpy(d_Q,Q_padded, sizeof(double)*padded_size, cudaMemcpyHostToDevice);
+
+
+    // Running FFT
+    cufftHandle plan_fft_series, plan_fft_Q;
+    cufftPlan1d(&plan_fft_series, padded_size, CUFFT_D2Z, 1);
+    cufftPlan1d(&plan_fft_Q, padded_size, CUFFT_D2Z, 1);
+    cufftExecD2Z(plan_fft_series, d_series_padded, d_fft_series);
+    cufftExecD2Z(plan_fft_Q, d_Q, d_fft_Q);
+
+    // Multiplication
+    
+    int blocks_mult;
+    choose_cuda_parameters(fft_size,blocks_mult,threads);
+    multiply_complex<<<blocks_mult, threads>>>(d_fft_series, d_fft_Q, fft_size);
+
+    // Inverse FFT
+    int blocks_normalization;
+    choose_cuda_parameters(fft_size,blocks_normalization,threads);
+    cufftHandle plan_ifft;
+    cufftPlan1d(&plan_ifft, padded_size, CUFFT_Z2D, 1);
+    cufftExecZ2D(plan_ifft, d_fft_series, d_QT_padded);
+    normalize_ifft<<<blocks_normalization, threads>>>(d_QT_padded, padded_size);
+    cudaMemcpy(d_QT, d_QT_padded+interval_size-1, mp_size * sizeof(double), cudaMemcpyDeviceToDevice );
+
+
+    cufftDestroy(plan_fft_series);
+    cufftDestroy(plan_fft_Q);
+    cufftDestroy(plan_ifft);
+
+    cudaFree(d_series_padded);
+    cudaFree(d_fft_series);
+    cudaFree(d_fft_Q);
+    cudaFree(d_QT_padded);
 
 }
+
+
