@@ -2,6 +2,7 @@
 #include <cpp/dataset.h>
 #include <cpp/matrix_profile.h>
 #include "cuda_funcs.h"
+
 #include <iostream>
 #include <memory>
 
@@ -190,18 +191,18 @@ void cuda_STOMP_iterations(const std::shared_ptr<cfade::DataSet> observed_datase
     cudaMalloc((void**) &QT_even, sizeof(double)* final_size);
     cudaMalloc((void**) &QT_odd, sizeof(double)* final_size);
     cudaMalloc((void**) &d_mean, sizeof(double)* final_size);
-    cudaMalloc((void**) &d_series, sizeof(double)* observed_dataset->get_size());
+    cudaMalloc((void**) &d_series, sizeof(double)* observed_dataset->get_length());
     cudaMalloc((void**) &d_stds, sizeof(double)* final_size);
 
     for(int dimension = 0; dimension<observed_dataset->get_dimension();dimension++){
 
-        std::vector<double> series_vec = (observed_dataset->get_data())[dimension];
+        std::vector<double> series_vec = (*(observed_dataset->get_data()))[dimension];
         std::vector<double> mean_vec = (*means)[dimension];
         std::vector<double> std_vec = (*stds)[dimension];
 
-        cudaMemcpy(d_mean, mean_vec.data(), final_size * sizeof(double), cudaMemcpyDeviceToDevice );
-        cudaMemcpy(d_stds, std_vec.data(), final_size * sizeof(double), cudaMemcpyDeviceToDevice );
-        cudaMemcpy(d_series, series_vec.data(), observed_dataset->get_size() * sizeof(double), cudaMemcpyDeviceToDevice );
+        cudaMemcpy(d_mean, mean_vec.data(), final_size * sizeof(double), cudaMemcpyHostToDevice );
+        cudaMemcpy(d_stds, std_vec.data(), final_size * sizeof(double), cudaMemcpyHostToDevice );
+        cudaMemcpy(d_series, series_vec.data(), observed_dataset->get_length() * sizeof(double), cudaMemcpyHostToDevice );
 
         fill_double<<<blocks,threads>>>(D,-1,number_of_updates);
         fill_int<<<blocks,threads>>>(I,-1,number_of_updates);
@@ -221,10 +222,11 @@ void cuda_STOMP_iterations(const std::shared_ptr<cfade::DataSet> observed_datase
                                             left_only);
         current_update++;
 
-        cudaMemcpy(QT_first, QT, final_size * sizeof(double), cudaMemcpyDeviceToDevice );
+        cudaMemcpy(QT_first, QT+dimension*final_size, final_size * sizeof(double), cudaMemcpyDeviceToDevice );
         cudaMemcpy(QT_odd, QT+dimension*final_size,final_size * sizeof(double), cudaMemcpyDeviceToDevice );
 
-        for(current_update; current_update<number_of_updates;current_update++){
+
+        for(; current_update<number_of_updates;current_update++){
             if (current_update%2){
                 stomp_iteration<<<blocks, threads>>>(d_series,
                                     QT_even,
@@ -254,7 +256,6 @@ void cuda_STOMP_iterations(const std::shared_ptr<cfade::DataSet> observed_datase
                                     exclusion_zone_size,
                                     left_only);
             }
-            current_update++;
         }
 
         std::vector<double> matrix_profile_vec(number_of_updates);

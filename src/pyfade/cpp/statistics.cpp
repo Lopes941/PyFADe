@@ -1,4 +1,5 @@
 
+#include<cpp/statistics.h>
 #include<cpp/window.h>
 #include<cpp/dataset.h>
 
@@ -8,41 +9,55 @@
 #include <stdexcept>
 #include <algorithm>
 #include <functional>
+#include <map>
+#include <string>
 
 namespace cfade
 {
-    ContinuousStatistics::ContinuousStatistics(const std::shared_ptr<DataSet>& observed_dataset):
-        means(std::make_shared<VectorGroup<double>>(observed_dataset->get_dimension())),
-        stds(std::make_shared<VectorGroup<double>>(observed_dataset->get_dimension()))
-    {}
+
+    ContinuousStatistics::ContinuousStatistics(const std::shared_ptr<DataSet>& observed_dataset,
+    const std::vector<std::shared_ptr<IFeatureGroup>> requirements):
+    IFeatureGroupCRTP(observed_dataset->get_dimension()){
+
+        if (observed_dataset->get_length() < 1){
+            throw std::invalid_argument("Observed dataset must have at least one data point.");
+        }
+        if (observed_dataset->get_dimension() < 1){
+            throw std::invalid_argument("Observed dataset must have at least one dimension.");
+        }
+
+        means = std::dynamic_pointer_cast<ContinuousMean>(feature_map[ContinuousMean::static_name()]);
+        stddev = std::dynamic_pointer_cast<ContinuousStandardDeviation>(feature_map[ContinuousStandardDeviation::static_name()]);
+        
+    }
 
     void ContinuousStatistics::update(const std::shared_ptr<DataSet> observed_dataset, int window_size){
 
-        if (observed_dataset->get_size() < window_size){
+        if (observed_dataset->get_length() < window_size){
             return;
         }
 
-        int last_means_size = means->cols;
-        int added_size = observed_dataset->get_size() - (last_means_size+window_size-1);
+        int last_means_size = means->get_length();
+        int added_size = observed_dataset->get_length() - (last_means_size+window_size-1);
 
         std::vector<double> new_cumsum(added_size+window_size);
         std::vector<double> new_cumsum2(added_size+window_size);
 
+        means->increase_cols(added_size);
+        stddev->increase_cols(added_size);
+
         for(int dimension=0; dimension<observed_dataset->get_dimension(); dimension++){
 
-            means->increase_cols(added_size);
-            stds->increase_cols(added_size);
-
             for(int i=0; i<added_size+window_size-1; i++){
-                new_cumsum[i+1] = observed_dataset->get_data(dimension,last_means_size+i) + new_cumsum[i];
-                new_cumsum2[i+1] = new_cumsum[i+1]*new_cumsum[i+1];
+                double current_data = observed_dataset->get_data(dimension,last_means_size+i);
+                new_cumsum[i+1] = current_data + new_cumsum[i];
+                new_cumsum2[i+1] = current_data*current_data + new_cumsum2[i];
 
                 if(i>=window_size-1){
                     double mean_val = (new_cumsum[i+1] - new_cumsum[i-window_size+1])/window_size;
 
                     means->at(dimension,last_means_size+i-window_size+1) = mean_val;
-
-                    stds->at(dimension,last_means_size+i-window_size+1) = 
+                    stddev->at(dimension,last_means_size+i-window_size+1) = 
                         std::sqrt((new_cumsum2[i+1] - new_cumsum2[i-window_size+1])/window_size - 
                         mean_val*mean_val);
                 }
@@ -51,25 +66,6 @@ namespace cfade
     }
 
     
-    const std::shared_ptr<VectorGroup<double>> ContinuousStatistics::get_feature(const std::string& feature)const{
-
-        if(feature==feature_names_string[0]){
-            return get_means();
-        }else if(feature == feature_names_string[1]){
-            return get_stds();
-        }else{
-            throw std::runtime_error("Invalid feature");
-        }
-    }
-
-    const std::shared_ptr<VectorGroup<double>> ContinuousStatistics::get_means()const{
-        return means;
-    }
-
-    const std::shared_ptr<VectorGroup<double>> ContinuousStatistics::get_stds()const{
-        return stds;
-    }
-    
     // DiscreteStatistics::DiscreteStatistics(const std::shared_ptr<DataSet>& observed_dataset):
     //     median(VectorGroup<double>(observed_dataset->get_dimension())),
     //     quantile(VectorGroup<double>(observed_dataset->get_dimension()))
@@ -77,12 +73,12 @@ namespace cfade
 
     // void DiscreteStatistics::update(const std::shared_ptr<DataSet> observed_dataset, int window_size){
 
-    //     if (observed_dataset->get_size() < window_size){
+    //     if (observed_dataset->get_length() < window_size){
     //         return;
     //     }
 
     //     int last_median_size = median.cols;
-    //     int added_size = observed_dataset->get_size() - (last_median_size+window_size-1);
+    //     int added_size = observed_dataset->get_length() - (last_median_size+window_size-1);
     //     int median_index = window_size/2;
 
     //     std::function<double(const std::vector<int>&,int&)> median_getter;

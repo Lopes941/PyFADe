@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.15...3.26)
+cmake_minimum_required(VERSION 3.15)
 project(pyfade LANGUAGES CXX)
 
 # Enable CUDA if available
@@ -11,33 +11,33 @@ set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 find_package(Python COMPONENTS Interpreter Development REQUIRED)
 find_package(pybind11 CONFIG REQUIRED)
 
-# # Trying to find CUDA
-# find_package(CUDAToolkit QUIET)
+# Trying to find CUDA
+find_package(CUDAToolkit QUIET)
 
-# if (DEFINED CUDAToolkit_ROOT)
-#     message(STATUS "CUDA found: Enabling GPU acceleration 1 ${CUDAToolkit_ROOT}")
-#     set(RESOLVED_CUDA_PATH "${CUDAToolkit_ROOT}")
-#     add_definitions(-DUSE_CUDA)
-#     set(HAS_CUDA TRUE)
-# elseif(DEFINED CUDA_PATH)
-#     message(STATUS "CUDA found: Enabling GPU acceleration 2 ${CUDA_PATH}")
-#     set(RESOLVED_CUDA_PATH "${CUDA_PATH}")
-#     add_definitions(-DUSE_CUDA)
-#     set(HAS_CUDA TRUE)
-# elseif (CUDAToolkit_FOUND)
-#     get_target_property(CUDART_LOCATION CUDA::cudart IMPORTED_LOCATION)
-#     get_filename_component(CUDA_LIB_DIR "${CUDART_LOCATION}" DIRECTORY)
-#     get_filename_component(CUDA_LIB_PARENT "${CUDA_LIB_DIR}" DIRECTORY)
-#     get_filename_component(CUDA_TOOLKIT_ROOT "${CUDA_LIB_PARENT}" DIRECTORY)
-#     message(STATUS "CUDA found: Enabling GPU acceleration 3 ${CUDA_TOOLKIT_ROOT}")
-#     set(RESOLVED_CUDA_PATH "${CUDA_TOOLKIT_ROOT}")
-#     add_definitions(-DUSE_CUDA)
-#     set(HAS_CUDA TRUE)
-# else()
-#     message(STATUS "CUDA not found: Building CPU-only version")
-#     set(RESOLVED_CUDA_PATH "")
-#     set(HAS_CUDA FALSE)
-# endif()
+if (DEFINED CUDAToolkit_ROOT)
+    message(STATUS "CUDA found: Enabling GPU acceleration 1 ${CUDAToolkit_ROOT}")
+    set(RESOLVED_CUDA_PATH "${CUDAToolkit_ROOT}")
+    add_definitions(-DUSE_CUDA)
+    set(HAS_CUDA TRUE)
+elseif(DEFINED CUDA_PATH)
+    message(STATUS "CUDA found: Enabling GPU acceleration 2 ${CUDA_PATH}")
+    set(RESOLVED_CUDA_PATH "${CUDA_PATH}")
+    add_definitions(-DUSE_CUDA)
+    set(HAS_CUDA TRUE)
+elseif (CUDAToolkit_FOUND)
+    get_target_property(CUDART_LOCATION CUDA::cudart IMPORTED_LOCATION)
+    get_filename_component(CUDA_LIB_DIR "${CUDART_LOCATION}" DIRECTORY)
+    get_filename_component(CUDA_LIB_PARENT "${CUDA_LIB_DIR}" DIRECTORY)
+    get_filename_component(CUDA_TOOLKIT_ROOT "${CUDA_LIB_PARENT}" DIRECTORY)
+    message(STATUS "CUDA found: Enabling GPU acceleration 3 ${CUDA_TOOLKIT_ROOT}")
+    set(RESOLVED_CUDA_PATH "${CUDA_TOOLKIT_ROOT}")
+    add_definitions(-DUSE_CUDA)
+    set(HAS_CUDA TRUE)
+else()
+    message(STATUS "CUDA not found: Building CPU-only version")
+    set(RESOLVED_CUDA_PATH "")
+    set(HAS_CUDA FALSE)
+endif()
 
 # Write the path to a Python file inside the package
 file(WRITE "${CMAKE_CURRENT_BINARY_DIR}/cuda_config.py"
@@ -48,24 +48,24 @@ file(WRITE "${CMAKE_CURRENT_BINARY_DIR}/cuda_config.py"
 install(FILES "${CMAKE_CURRENT_BINARY_DIR}/cuda_config.py"
         DESTINATION pyfade)
 
-# file(GLOB CPP_SOURCES src/pyfade/bindings/*.cpp)
 
 set(SOURCE_FILES
     src/pyfade/bindings.cpp
+    src/pyfade/cpp/utils.cpp
     src/pyfade/cpp/dataset.cpp
     src/pyfade/cpp/statistics.cpp
-    # src/pyfade/cpp/matrix_profile.cpp
+    src/pyfade/cpp/matrix_profile.cpp
     )
 
-# if (HAS_CUDA)
-#     list(APPEND SOURCE_FILES src/pyfade/cpp/cuda_funcs.cu)
-# endif()
+if (HAS_CUDA)
+    list(APPEND SOURCE_FILES src/pyfade/cpp/cuda_funcs.cu)
+endif()
 
 pybind11_add_module(core ${SOURCE_FILES})
 
-# if (HAS_CUDA)
-#     target_link_libraries(core PRIVATE CUDA::cufft CUDA::cudart)
-# endif()
+if (HAS_CUDA)
+    target_link_libraries(core PRIVATE CUDA::cufft CUDA::cudart)
+endif()
 
 target_include_directories(core PRIVATE ${PROJECT_SOURCE_DIR}/src/pyfade)
 install(TARGETS core LIBRARY DESTINATION pyfade)

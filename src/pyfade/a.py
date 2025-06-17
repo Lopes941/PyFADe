@@ -1,10 +1,10 @@
 import pandas as pd
 import numpy as np
 from scipy.interpolate import interp1d
-from typing import Union, List, Dict
+from typing import Union, List
 
 from .series import DataFrame
-from .core import IDataSetObserver, IFeatureGroup, ContinuousStatistics, MatrixProfile, KProfile
+from .core import IDataSetObserver, FeatureGroupInterface, ContinuousStatistics, MatrixProfile
 
 
 class WindowBuilder:
@@ -16,7 +16,9 @@ class WindowBuilder:
 
     def set_window_size(self,window_size: int):
         self.window.window_size = window_size
-        return self
+
+    def _add_feature_group(self, added_feature_group: FeatureGroupInterface):
+        self.window.dict_of_feature_groups[added_feature_group.name()] = added_feature_group
 
     def build(self):
         if self.window.window_size == 0:
@@ -31,22 +33,18 @@ class Window(IDataSetObserver):
     def __init__(self):
         self.window_size: int = 0
         self.observed_dataframe: DataFrame = None
-        self.dict_of_feature_groups: Dict[str,IFeatureGroup] = {}
+        self.dict_of_feature_groups: dict = {}
         super().__init__()
 
     def __del__(self):
         if self.observed_dataframe is not None:
-            self.observed_dataframe.dataset.remove_observer(self)
+            self.observed_dataframe.remove_observer(self)
 
     def update(self):
         for group in self.dict_of_feature_groups.values():
             group.update(self.observed_dataframe.dataset,self.window_size)
 
-    def _add_feature_group(self, added_feature_group: IFeatureGroup):
-        added_feature_group.update(self.observed_dataframe.dataset,self.window_size)
-        self.dict_of_feature_groups[added_feature_group.name()] = added_feature_group
-        
-
+    
     def get_requirements(self, group_name: str):
         data = []
         for requirement in feature_group_requirements[group_name]:
@@ -67,23 +65,11 @@ class Window(IDataSetObserver):
         
     @property
     def std(self):
-        return self.get_feature('stddev')
+        return self.get_feature('std')
     
     @property
     def mp(self):
-        return self.get_feature('matrix_profile_value')
-    
-    @property
-    def mp_ind(self):
-        return self.get_feature('matrix_profile_index')
-    
-    @property
-    def kp(self):
-        return self.get_feature('k_profile_value')
-    
-    @property
-    def kp_ind(self):
-        return self.get_feature('k_profile_index')
+        return self.get_feature('matrix_profile')
 
     @property
     def index(self):
@@ -91,7 +77,7 @@ class Window(IDataSetObserver):
     
 class FeatureGroupBuilder:
 
-    def __init__(self, feature_group_name: str, parent_window: Window) -> IFeatureGroup:
+    def __init__(self, feature_group_name: str, parent_window: Window) -> FeatureGroupInterface:
 
         self.parent = parent_window
         if feature_group_name in self.parent.dict_of_feature_groups.keys():
@@ -109,14 +95,13 @@ class FeatureGroupBuilder:
 
     def build(self):
         if self._feature_group is not None:
-            self.parent._add_feature_group(self._feature_group)
+            self.parent.dict_of_feature_groups[self._feature_group.name()] = self._feature_group
             self._feature_group = None
 
     def set_parameter(self, parameter_name: str, parameter_value):
         self._feature_group.set_parameter(parameter_name,parameter_value)
-        return self
 
-class PythonStatistics(IFeatureGroup):
+class PythonStatistics(FeatureGroupInterface):
 
     @staticmethod
     def static_name():
@@ -128,18 +113,18 @@ class PythonStatistics(IFeatureGroup):
     
     @staticmethod
     def static_requirements():
-        return ['ContinuousStatistics']
+        return []
     
     @staticmethod
     def static_parameters():
         return []
 
-    def __init__(self, dataset: DataFrame, requirements: List[IFeatureGroup]):
+    def __init__(self, dataset: DataFrame, cont_mean: ContinuousStatistics):
         super().__init__()
         self.meanpy = np.empty((dataset.data.ndim,0),dtype=float)
         self.stdpy = np.empty((dataset.data.ndim,0),dtype=float)
 
-        self.cont_mean = requirements[0]
+        self.cont_mean = cont_mean
 
     def name(self):
         return PythonStatistics.static_name()
@@ -163,11 +148,13 @@ class PythonStatistics(IFeatureGroup):
         
     def update(self, dataset: DataFrame, window_size: int):
         window = np.lib.stride_tricks.sliding_window_view(dataset.data, window_size,axis=1)
+        # self.meanpy = np.mean(window,axis=2)
+        # self.stdpy = np.std(window, axis=2)
         self.meanpy = self.cont_mean.means
         self.stdpy = self.cont_mean.stds
 
     
-FEATURE_GROUP_LIST = [ContinuousStatistics, PythonStatistics, MatrixProfile, KProfile]
+FEATURE_GROUP_LIST = [ContinuousStatistics, PythonStatistics, MatrixProfile]
 
 # FeatureNames = []
 feature_group_callable = {}

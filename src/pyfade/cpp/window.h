@@ -3,56 +3,66 @@
 #include <vector>
 #include <memory>
 #include <string>
+#include <any>
+#include <stdexcept>
+#include <variant>
+#include <map>
 
 #include<cpp/dataset.h>
+#include <cpp/features.h>
 
 
-namespace cfade
-{
+namespace cfade{
+    
 
-    class FeatureGroupInterface{
+    
+
+
+
+    // =====================
+    // Parameter definitions
+    // =====================
+
+
+    class IFeatureGroupParameter{
 
         public:
-            ~FeatureGroupInterface()=default;
-            virtual const std::shared_ptr<VectorGroup<double>> get_feature(const std::string&) const=0;
+            ~IFeatureGroupParameter()=default;
             virtual const std::string& name() const = 0;
-            virtual const std::vector<std::string>& feature_names() const = 0;
-            virtual void update(const std::shared_ptr<DataSet>, int)=0;
-
+            virtual void set(VariantTypes)=0;
+            
     };
 
-
-
-    class ContinuousStatistics: public FeatureGroupInterface{
+    template <typename Derived>
+    class FeatureGroupParameter: public IFeatureGroupParameter{
 
         private:
-            std::shared_ptr<VectorGroup<double>> means;
-            std::shared_ptr<VectorGroup<double>> stds;
-        
+            VariantTypes value;
+
         public:
 
-            inline static const std::string group_name = "ContinuousStatistics";
-            inline static const std::vector<std::string> feature_names_string = {"mean","std"};
+            ~FeatureGroupParameter()=default;
 
-            inline const std::string& name() const override final { return group_name;}
-            inline const std::vector<std::string>& feature_names() const override final { return feature_names_string;}
+            inline const std::string& name() const override final{
+                return Derived::static_name();
+            }
 
-            ContinuousStatistics()=default;
-            ContinuousStatistics(const std::shared_ptr<DataSet>&);
-            ~ContinuousStatistics()=default;
+            inline void set(VariantTypes val) override final{
+                value = std::visit(
+                    [](auto&& arg) -> typename Derived::value_type {
+                        return static_cast<typename Derived::value_type>(arg);
+                    },val);
+            }
 
-            void update(const std::shared_ptr<DataSet>, int) override;
-            const std::shared_ptr<VectorGroup<double>> get_feature(const std::string&) const override;
-            const std::shared_ptr<VectorGroup<double>> get_means() const;
-            const std::shared_ptr<VectorGroup<double>> get_stds() const;
-            
-
+            inline auto get() const{
+                return std::get<typename Derived::value_type>(value);
+            }
     };
 
 
-    
 
     
+
 
 } // namespace cfade
 
@@ -64,7 +74,7 @@ namespace cfade
 
 
 
-    // class DiscreteStatistics: public FeatureGroupInterface{
+    // class DiscreteStatistics: public IFeatureGroup{
 
         
 
