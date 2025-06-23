@@ -8,6 +8,19 @@ from .core import IDataSetObserver, IFeatureGroup, ContinuousStatistics, MatrixP
 
 
 class WindowBuilder:
+    """
+    Builder class for creating a Window object that observes a DataFrame.
+    This class is used to set the window size and build the Window object.
+    It is designed to be used in a fluent interface style, allowing method chaining.
+    Usage:
+        window_builder = WindowBuilder(dataframe)
+        window = window_builder.set_window_size(10).build()
+    Args:
+        dataframe (DataFrame): The DataFrame to observe.
+    Attributes:
+        window (Window): The Window object being built.
+    This class allows setting the window size and building the Window object.
+    """
 
     def __init__(self, dataframe: DataFrame):
         self.window = Window()

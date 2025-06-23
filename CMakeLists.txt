@@ -67,5 +67,5 @@ if (HAS_CUDA)
     target_link_libraries(core PRIVATE CUDA::cufft CUDA::cudart)
 endif()
 
-target_include_directories(core PRIVATE ${PROJECT_SOURCE_DIR}/src/pyfade)
+target_include_directories(core PRIVATE ${PROJECT_SOURCE_DIR}/includes)
 install(TARGETS core LIBRARY DESTINATION pyfade)

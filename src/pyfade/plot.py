@@ -13,6 +13,30 @@ HSPACE = 0.2
 
 # TODO add docstring
 def _plot_multiple_series(data:pd.Series, height: float, width: float, ylimits: list, xlabel: str, ylabel: str | list,style,fig,axs, **kwargs) -> Tuple[matplotlib.figure.Figure, list]:
+    """ Creates a window with multiple plots aligns vertically.
+
+        Parameters
+        ----------
+        data: pandas.Series
+            Set of data to be ploted.
+        height: float, optional (default = 1)
+            Height of each subplot. Total height of window will be this height times the number of plotted data.
+        width: float, optional (default = 7)
+            Width of each subplot.
+        ylimits: list, optional
+            Limits of the y-axis in all plots.
+        xlabel: str, optional (default = 'Timestamp')
+            Label of the x-axis.
+        ylabel: str or list, optional (default = 'Signal')
+            Label of each y-axis. If a string is given, will add the number of the plot after the string (i.e. the default value 'Signal' will show as 'Signal 1', 'Signal 2', ...). If a list is given, the labels will be each of the elements.
+
+        Returns
+        -------
+        fig: matplotlib.figure
+            Figure object.
+        axs: list[matplotlib.axis]
+            List of each of the axis.
+    """
 
     second_plot = False
     # Creating window and axes

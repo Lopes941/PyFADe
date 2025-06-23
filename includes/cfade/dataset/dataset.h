@@ -1,6 +1,6 @@
 #pragma once
 
-#include <cpp/utils.h>
+#include <cfade/utils/utils.h>
 
 #include <vector>
 #include <memory>
@@ -82,11 +82,9 @@ namespace cfade{
      * 
      */
     class DataSet : public DataSetObservable{
-
         
         private:
-
-            
+        
             std::shared_ptr<VectorGroup<double>> data; /**< Data container for the time series. */
             
             /**

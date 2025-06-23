@@ -4,9 +4,19 @@
 #include <memory>
 #include <variant>
 
+
 namespace cfade{
 
-    
+    /**
+     * @brief Get a vector of 
+     * 
+     * This method returns an int vector with the indices that sort the data array in descending order.
+     * 
+     * @param data The vector of double whose sorted indices must be obtained.
+     * @param size The size of the vector.
+     * @return std::vector<int> vector of indices
+     */
+    std::vector<int> argsort_descending(const double* data, const int size);
 
     /**
      * @brief A 2D data container for storing data in column-major format.

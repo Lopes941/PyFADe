@@ -1,12 +1,26 @@
 
-#include <cpp/utils.h>
+#include <cfade/utils/utils.h>
 
 #include <vector>
 #include <memory>
-#include <stdexcept>
 #include <string>
+#include <stdexcept>
+#include <numeric>
+#include <algorithm>
 
 namespace cfade{
+
+    std::vector<int> argsort_descending(const double* data, const int size){
+
+        std::vector<int> indices(size);
+        std::iota(indices.begin(), indices.end(), 0);
+        std::sort(indices.begin(), indices.end(),
+            [data](int left, int right) -> bool {
+                return data[left] > data[right];
+            });
+
+        return indices;
+    }
 
     template <typename T>
     VectorGroup<T>::VectorGroup(): 

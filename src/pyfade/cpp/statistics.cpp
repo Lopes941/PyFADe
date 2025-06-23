@@ -1,14 +1,15 @@
 
-#include<cpp/statistics.h>
-#include<cpp/window.h>
-#include<cpp/dataset.h>
+#include <cfade/features/statistics.h>
+#include <cfade/features/features.h>
+#include <cfade/dataset/dataset.h>
+#include <cfade/utils/utils.h>
+#include <cfade/groups/statistics.h>
 
 #include <numeric>
 #include <cmath>
 #include <memory>
 #include <stdexcept>
 #include <algorithm>
-#include <functional>
 #include <map>
 #include <string>
 
@@ -16,7 +17,7 @@ namespace cfade
 {
 
     ContinuousStatistics::ContinuousStatistics(const std::shared_ptr<DataSet>& observed_dataset,
-    const std::vector<std::shared_ptr<IFeatureGroup>> requirements):
+    const std::vector<std::shared_ptr<IFeatureGroup>>& requirements):
     IFeatureGroupCRTP(observed_dataset->get_dimension()){
 
         if (observed_dataset->get_length() < 1){
@@ -31,7 +32,7 @@ namespace cfade
         
     }
 
-    void ContinuousStatistics::update(const std::shared_ptr<DataSet> observed_dataset, int window_size){
+    void ContinuousStatistics::update(const std::shared_ptr<DataSet>& observed_dataset, int window_size){
 
         if (observed_dataset->get_length() < window_size){
             return;
