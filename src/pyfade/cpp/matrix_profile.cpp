@@ -14,7 +14,7 @@
 
 
 #ifdef USE_CUDA
-    #include "cuda_funcs.h"
+    #include <cfade/cuda/cuda_funcs.h>
     #include <cufft.h>
     #include <cuda_runtime.h>
 #endif
@@ -71,6 +71,7 @@ namespace cfade{
         if (!found){
             throw std::runtime_error("Did not find " + ContinuousStatistics::static_name() + " dependency from " + static_name());
         }
+        raw_matrix_profile = std::make_shared<VectorGroup<double>>(observed_dataset->get_dimension());
         feature_map[MatrixProfileValue::static_name()] = matrix_profile;
         feature_map[MatrixProfileIndex::static_name()] = index;
         
@@ -86,6 +87,8 @@ namespace cfade{
             skip_start.set(val);
         }else if (name == ExclusionZoneRatioParam::parameter_name){
             exclusion_zone_ratio.set(val);
+        }else if (name == QuantileParam::parameter_name){
+            quantile_param.set(val);
         }else{
             std::string text = static_name() + " has no '" + name + "' parameter.";
             throw std::invalid_argument(text);
@@ -95,15 +98,31 @@ namespace cfade{
     void MatrixProfile::update(const std::shared_ptr<DataSet>& observed_dataset,
                         int window_size){
 
-
+        if (observed_dataset->get_length() < window_size){
+            return;
+        }
         
         int start_loc = matrix_profile->get_length();
         int final_size = observed_dataset->get_length() - window_size + 1;
 
+        if(skip_start.get()==-1)
+            skip_start = SkipStartParam(window_size);
+
+        if(final_size < skip_start.get()){
+            return;
+        }
+
         matrix_profile->increase_cols(final_size-start_loc);
         index->increase_cols(final_size-start_loc);
+        raw_matrix_profile->increase_cols(final_size-start_loc);
 
         int exclusion_zone_size = (int) std::round(exclusion_zone_ratio.get()*window_size);
+
+        for(int old_ind=0; old_ind<start_loc; old_ind++){
+            for(int dim=0; dim<observed_dataset->get_dimension();dim++){
+                matrix_profile->at(dim,old_ind) = raw_matrix_profile->at(dim,old_ind);
+            }
+        }
         
         std::shared_ptr<QTDataInterface> QT = get_QT(observed_dataset,
                                     means,
@@ -125,8 +144,7 @@ namespace cfade{
                         left_only.get(),
                         use_cuda.get());
 
-        if(skip_start.get()==-1)
-            skip_start = SkipStartParam(window_size);
+        
 
         
         for(int i=start_loc; i<skip_start.get(); i++){
@@ -136,11 +154,22 @@ namespace cfade{
             }
         }
 
-            // for(i; i<index->cols; i++){
-            //     if(index->at(dim,i)>=0)
-            //     matrix_profile->at(dim,i) = std::max(matrix_profile->at(dim,index->at(dim,i)),
-            //                                         matrix_profile->at(dim,i));
-            // }
+        for(int i=start_loc; i<final_size; i++){
+            for(int dim=0; dim<observed_dataset->get_dimension();dim++){
+                raw_matrix_profile->at(dim,i) = matrix_profile->at(dim,i);
+            }
+        }
+
+        std::vector<double> quantiles = quantile(raw_matrix_profile, quantile_param.get());
+        for(int i=0; i<final_size; i++){
+            for(int dim=0; dim<observed_dataset->get_dimension();dim++){
+                if(matrix_profile->at(dim,i) >= quantiles[dim]){
+                    matrix_profile->at(dim,i) -= quantiles[dim];
+                }else{
+                    matrix_profile->at(dim,i) = 0;
+                }
+            }
+        }
         
     }
 

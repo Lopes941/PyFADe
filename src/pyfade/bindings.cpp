@@ -9,10 +9,15 @@
 #include <any>
 #include <variant>
 
-#include <cpp/dataset.h>
-#include <cpp/window.h>
-#include <cpp/statistics.h>
-#include <cpp/matrix_profile.h>
+#include <cfade/dataset/dataset.h>
+
+#include <cfade/features/features.h>
+
+#include <cfade/groups/groups.h>
+#include <cfade/groups/statistics.h>
+#include <cfade/groups/matrix_profile.h>
+#include <cfade/groups/k_profile.h>
+
 
 namespace py = pybind11;
 
@@ -133,12 +138,12 @@ class pyFeatureGroupTrampoline: public cfade::IFeatureGroup{
             );
         }
         
-        void update(const std::shared_ptr<cfade::DataSet> dataset, int window_size) override{
+        void update(const std::shared_ptr<cfade::DataSet>& observed_dataset, int window_size) override{
             PYBIND11_OVERRIDE_PURE(
                 void,
                 cfade::IFeatureGroup,
                 update,
-                dataset,
+                observed_dataset,
                 window_size
             );
         }

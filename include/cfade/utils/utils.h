@@ -8,7 +8,7 @@
 namespace cfade{
 
     /**
-     * @brief Get a vector of 
+     * @brief Get a vector of indices sorted in ascending order.
      * 
      * This method returns an int vector with the indices that sort the data array in descending order.
      * 
@@ -17,6 +17,8 @@ namespace cfade{
      * @return std::vector<int> vector of indices
      */
     std::vector<int> argsort_descending(const double* data, const int size);
+
+    
 
     /**
      * @brief A 2D data container for storing data in column-major format.
@@ -125,5 +127,8 @@ namespace cfade{
     using VariantVec= std::variant<
                         std::shared_ptr<VectorGroup<int>>, 
                         std::shared_ptr<VectorGroup<double>>>;
+
+    // TODO
+    std::vector<double> quantile(const std::shared_ptr<VectorGroup<double>>& data, double p);
 
 } // namespace cfade

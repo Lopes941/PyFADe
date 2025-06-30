@@ -1,7 +1,8 @@
 
-#include <cpp/dataset.h>
-#include <cpp/matrix_profile.h>
-#include "cuda_funcs.h"
+#include <cfade/utils/utils.h>
+#include <cfade/dataset/dataset.h>
+#include <cfade/cuda/cuda_funcs.h>
+
 
 #include <iostream>
 #include <memory>

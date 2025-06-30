@@ -22,6 +22,34 @@ namespace cfade{
         return indices;
     }
 
+    std::vector<double> quantile(const std::shared_ptr<VectorGroup<double>>& data, double p){
+
+         if (data->data.empty()) {
+            return {0.0}; // Or throw an exception
+        }
+        
+        if (p < 0.0) p = 0.0;
+        if (p > 1.0) p = 1.0;
+
+        // Calculate the index corresponding to the quantile
+        size_t n = data->cols;
+        size_t k = static_cast<size_t>(p * (n - 1));
+
+        std::vector<double> result(data->rows);
+
+        for(int dim=0; dim<data->rows; dim++){
+
+            std::vector<double> row_data = (*data)[dim];
+            
+            std::nth_element(row_data.begin(),row_data.begin()+k,row_data.end());
+
+            result[dim] = row_data[k];
+        }
+
+        return result;
+
+    }
+
     template <typename T>
     VectorGroup<T>::VectorGroup(): 
         rows(0), 

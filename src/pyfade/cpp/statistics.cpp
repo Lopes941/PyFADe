@@ -44,6 +44,7 @@ namespace cfade
         std::vector<double> new_cumsum(added_size+window_size);
         std::vector<double> new_cumsum2(added_size+window_size);
 
+
         means->increase_cols(added_size);
         stddev->increase_cols(added_size);
 

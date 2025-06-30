@@ -263,9 +263,67 @@ namespace cfade{
 
     };
 
-    // ===============
-    // MatrixProfile Class
-    // ===============
+    /**
+     * @brief Parameter for the low quantile threshold in matrix profile.
+     * 
+     * This parameter specifies the quantile to be defined as the 0 of the matrix profile.
+     * This is a parameter to be added in very noisy signals, so only peak Matrix Profile values are returned.
+     * 
+     * @tparam Derived The derived class that implements the feature group parameter.
+     */
+    class QuantileParam: public FeatureGroupParameter<QuantileParam>{
+
+        public:
+
+            /**
+             * @brief Type of the value for the ExclusionZoneRatioParam.
+             * 
+             * This type is a double indicating the ratio of the exclusion zone to the window size.
+             */
+            using value_type = double;
+
+            /**
+             * @brief Name of the parameter.
+             * 
+             * This static constant holds the name of the parameter, which is used to identify it in the system.
+             */
+            inline static const std::string parameter_name = "quantile_threshold";
+
+            /**
+             * @brief Get the name of the parameter.
+             * 
+             * This static method returns the name of the parameter, which is used to identify it in the system.
+             * 
+             * @return const std::string& The name of the parameter.
+             */
+            static const std::string& static_name() { return parameter_name;}
+
+
+            /**
+             * @brief Default constructor for ExclusionZoneRatioParam.
+             * 
+             * This constructor initializes the parameter with a default value of 0.5.
+             */
+            inline QuantileParam(){set(0.);}
+
+            /**
+             * @brief Constructor for ExclusionZoneRatioParam with a specified value.
+             * 
+             * This constructor initializes the parameter with the specified value.
+             * 
+             * @param val The value to set for the parameter, as a double.
+             */
+            inline QuantileParam(value_type val){set(val);}
+
+            /**
+             * @brief Default destructor for ExclusionZoneRatioParam.
+             * 
+             * This destructor is defaulted and does not perform any additional actions.
+             */
+            ~QuantileParam()=default;
+
+    };
+
 
 
     /**
@@ -317,13 +375,15 @@ namespace cfade{
                 LeftOnlyParam::parameter_name,
                 SkipStartParam::parameter_name,
                 ExclusionZoneRatioParam::parameter_name,
+                QuantileParam::parameter_name,
             };
 
 
             std::shared_ptr<VectorGroup<double>> means; /**< Mean values of the matrix profile */
             std::shared_ptr<VectorGroup<double>> stds; /**< Standard deviation values of the matrix profile */
+            std::shared_ptr<VectorGroup<double>> raw_matrix_profile; /**< Matrix profile values */
 
-            std::shared_ptr<MatrixProfileValue> matrix_profile; /**< Matrix profile values */
+            std::shared_ptr<MatrixProfileValue> matrix_profile; /**< Matrix profile values after quantile evaluation */
             std::shared_ptr<MatrixProfileIndex> index; /**< Indices of the matrix profile */
             std::shared_ptr<VectorGroup<double>> QT; /**< QT values for the matrix profile */
 
@@ -331,6 +391,7 @@ namespace cfade{
             LeftOnlyParam left_only; /**< Use left-only matching */
             SkipStartParam skip_start; /**< Skip start of the time series */
             ExclusionZoneRatioParam exclusion_zone_ratio; /**< Exclusion zone ratio */
+            QuantileParam quantile_param; /**< Excluded quantile number */
 
         public:
 

@@ -163,7 +163,7 @@ namespace cfade{
              */
             inline IFeatureGroupCRTP(){
                 for(const auto& feature_name : Derived::static_feature_names()){
-                    feature_map[feature_name] = std::make_shared<feature_type_map[feature_name]>();
+                    feature_map[feature_name] = feature_builder_map[feature_name](0);
                 }
             }
 
@@ -178,7 +178,7 @@ namespace cfade{
              */
             inline IFeatureGroupCRTP(int dimension){
                 for(const auto& feature_name : Derived::static_feature_names()){
-                    feature_map[feature_name] = std::make_shared<feature_type_map[feature_name]>(dimension);
+                    feature_map[feature_name] = feature_builder_map[feature_name](dimension);
                 }
             }
 

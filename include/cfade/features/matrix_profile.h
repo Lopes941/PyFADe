@@ -62,7 +62,7 @@ namespace cfade{
              * 
              * @param rows The number of rows in the feature vector.
              */
-            MatrixProfileValue(int rows=0)
+            MatrixProfileValue(int rows)
                 : IFeatureCRTP<MatrixProfileValue>(rows) {}
 
             /**

@@ -30,11 +30,5 @@ doc/source/regression/*.ipynb
 .pydevproject
 .settings
 
-
-
-TimeSeries.ipynb
 Documents/*
 Epic/*
-
-wavelet_test.py
-wavelet_test2.py

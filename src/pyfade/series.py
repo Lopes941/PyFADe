@@ -35,10 +35,6 @@ class Extrapolation:
 
     CONSTANT = 1
 
-# ========================
-# Interpolator class
-# ========================
-
 class InterpolatorInterface(ABC):
     """
     Interpolator interface for interpolating and extrapolating data.
@@ -96,7 +92,6 @@ class InterpolatorInterface(ABC):
         """
         pass
 
-
 class NumpyInterpolator(InterpolatorInterface):
     """
     NumpyInterpolator class that implements the InterpolatorInterface.
@@ -129,8 +124,8 @@ class NumpyInterpolator(InterpolatorInterface):
 
     _last_valid_index=None
     _last_index_from_previous=None
-    _extrapolation_method=None
-    _interpolation_method=None
+    extrapolation_method=Extrapolation.CONSTANT
+    interpolation_method=Interpolation.LINEAR
 
     def __init__(self):
         """
@@ -280,13 +275,62 @@ class NumpyInterpolator(InterpolatorInterface):
                 if not good_indices_address[-1]:
                     data[good_indices_location[-1]:] = data[good_indices_location[-1]]
 
-# ========================
-# DataFrame class
-# ========================
+class DataCleaner():
 
+    def __init__(self):
+        self.column_name = []
+        self.value = []
+        self.comparison = []
+        self.drop_column = []
+    
+    def add_clean(self, column_name, value: object, comparison: str = '=', drop_column=True):
+
+        self.column_name.append(column_name)
+        self.value.append(value)
+        self.drop_column.append(drop_column)
+
+        if comparison not in ['=', '>', '<']:
+            raise AttributeError("Comparison type must be '=', '>' or '<'")
+
+        self.comparison.append(comparison)
+
+    def run_cleaner(self, data: np.ndarray, index: np.ndarray) -> np.ndarray:
+
+        mask = np.ones(data.shape[0],dtype=bool)
+        remove_cols = []
+
+        for i in range(len(self.column_name)):
+
+            col = self.column_name[i]
+            val = self.value[i]
+            comp = self.comparison[i]
+
+            col_idx = np.where(col==index)[0][0]
+            col_data = data[col_idx,:]
+
+            if comp == '=':
+                mask &= (col_data == val)
+            elif comp == '>':
+                mask &= (col_data > val)
+            elif comp == '<':
+                mask &= (col_data < val)
+
+            if self.drop_column[i]:
+                remove_cols.append(col_idx)
+
+        data[:] = data[mask]
+
+        remove_cols = sorted(set(remove_cols), reverse=True)
+        data = np.delete(data, remove_cols, axis=1)
+
+        return data
+
+
+
+# TODO add cleaner and dimensions
 class DataFrame:
     """
-    Builder pattern that builds a DataFrame object.
+    DataFrame object that holds multi-dimensional time series data.
 
     This class is used to manage multi-dimensional time series data, allowing for
     interpolation and extrapolation of missing values. It provides properties to access
@@ -309,8 +353,6 @@ class DataFrame:
         Multi-dimensional time series held by dataset.
     index: np.ndarray
         Index from the multi-dimensional time series held by dataset.
-    as_pandas: pandas.DataFrame
-        Data and index from dataset, returned as a pandas Dataframe.
 
     See Also
     --------
@@ -326,6 +368,8 @@ class DataFrame:
 
     interpolator = None
     dataset = None
+    cleaner = None
+    dimensions = None
 
     def __init__(self):
         """
@@ -333,6 +377,8 @@ class DataFrame:
         """
         self.dataset = None
         self.interpolator = None
+        self.cleaner = None
+        self.dimensions = None
 
     @property
     def data(self) -> np.ndarray:
@@ -391,10 +437,17 @@ class DataFrame:
         """
         return self.dataset.index
 
-    @property
+
     def as_pandas(self) -> pandas.DataFrame:
         """
-        pandas.DataFrame : Returns the DataFrame as a pandas DataFrame.
+        Returns the data and the index from the dataset as a pandas DataFrame.
+
+        This method can be called to return de dataset as a pandas DataFrame object.
+        
+        Returns
+        -------
+        pandas.DataFrame:
+            Dataset written as a pandas DataFrame.
         """
         return pandas.DataFrame(self.data.T,index=self.dataset.index)
 
@@ -409,6 +462,7 @@ class DataFrame:
         and runs the interpolation and extrapolation methods on the initial data.
 
         It is expected that the dataset has been set before calling this method.
+
         Raises
         -------
         RuntimeError: If the dataset is not set before calling this method.
@@ -437,9 +491,11 @@ class DataFrame:
 
         old_data = self.dataset.data
         self.interpolator.run_interpolation_extrapolation(old_data[:])
+        self.cleaner.run_cleaner(old_data[:], self.dataset.index)
 
 
-    def insert_data(self, inserted_data: np.ndarray | pandas.DataFrame):
+
+    def insert_data(self, inserted_data: np.ndarray | pandas.DataFrame | pandas.Series):
         """
         Inserts new data in the timeseries. Already runs the interpolators.
 
@@ -449,10 +505,12 @@ class DataFrame:
             New inserted data.
         """
 
-        if isinstance(inserted_data,pandas.DataFrame) and isinstance(self.dataset,PandasDataSet):
+        if (isinstance(inserted_data,pandas.DataFrame) or isinstance(inserted_data,pandas.Series)) and isinstance(self.dataset,PandasDataSet):
             new_data = inserted_data.values
+            new_index = inserted_data.index
         elif isinstance(inserted_data,np.ndarray) and isinstance(self.dataset,NumpyDataSet):
             new_data = inserted_data
+            new_index = np.arange(new_data.size) + self.dataset.len
         else:
             raise ValueError("Incorrect type for inserted data")
 
@@ -468,14 +526,15 @@ class DataFrame:
         if isinstance(inserted_data,np.ndarray):
             new_data = old_data[:,-new_data.shape[1]:]
         elif isinstance(inserted_data,pandas.DataFrame):
-            new_data = pandas.DataFrame(old_data[:,-new_data.shape[1]:],
-                                        index= inserted_data.index)
+            new_data = pandas.DataFrame(old_data[:,-new_data.shape[1]:].T,
+                                        index= new_index)
+        elif isinstance(inserted_data,pandas.Series):
+            new_data = pandas.DataFrame(old_data[:,-new_data.size:].T,
+                                        index= new_index)
             
+        self.cleaner.run_cleaner(new_data,new_index)
         self.dataset.insert(new_data)
 
-# ========================
-# DataFrameBuilder class
-# ========================
 
 class DataFrameBuilder:
     """
@@ -525,7 +584,7 @@ class DataFrameBuilder:
                             .build()
     >>> print(dataframe.data)
     [[ 1.  2.  2.]
-        [ 4.  5.  6.]]
+    [ 4.  5.  6.]]
     >>> print(dataframe.as_pandas)
     A    B
     0  1.0  4.0
@@ -558,14 +617,18 @@ class DataFrameBuilder:
         if isinstance(data,pandas.DataFrame):
             self._dataframe.dataset = PandasDataSet()
             self._dataframe.interpolator = NumpyInterpolator()
+            self._dataframe.cleaner = DataCleaner()
             self._dataframe.dataset.data = data.values.T
             self._dataframe.dataset.index = data.index
+            self._dataframe.dimensions = data.columns
 
         elif isinstance(data,pandas.Series):
             self._dataframe.dataset = PandasDataSet()
             self._dataframe.interpolator = NumpyInterpolator()
+            self._dataframe.cleaner = DataCleaner()
             self._dataframe.dataset.data = data.values[np.newaxis,:]
             self._dataframe.dataset.index = data.index
+            self._dataframe.dimensions = [data.name]
 
         elif isinstance(data, np.ndarray):
 
@@ -576,8 +639,10 @@ class DataFrameBuilder:
 
             self._dataframe.dataset = NumpyDataSet()
             self._dataframe.interpolator = NumpyInterpolator()
+            self._dataframe.cleaner = DataCleaner()
             self._dataframe.dataset.data = data
-            self._dataframe.dataset.index = np.arange(data.size,dtype=int)
+            self._dataframe.dataset.index = np.arange(data.shape[1],dtype=int)
+            self._dataframe.dimensions = np.empty(data.shape[0],dtype=str)
 
         else:
             raise RuntimeError("Invalid type for data")
@@ -621,15 +686,7 @@ class DataFrameBuilder:
         -------
         self : DataFrameBuilder
             For method chaining.
-
-        Raises
-        -------
-        ValueError: If the interpolation method is not of type Interpolation.
-
         """
-
-        if not isinstance(interpolation, Interpolation):
-            raise ValueError("Interpolation must be of type Interpolation")
 
         self._dataframe.interpolator.interpolation_method = interpolation
         return self
@@ -650,21 +707,14 @@ class DataFrameBuilder:
         -------
         self : DataFrameBuilder
             For method chaining.
-
-        Raises
-        -------
-        ValueError: If the extrapolation method is not of type Extrapolation.
         """
-
-        if not isinstance(extrapolation, Extrapolation):
-            raise ValueError("Extrapolation must be of type Extrapolation")
 
         self._dataframe.interpolator.extrapolation_method = extrapolation
         return self
 
-# ========================
-# DataSet derived classes
-# ========================
+    def add_clean(self, column_name, value: object, comparison: str = '=', drop_column=True) ->Self:
+        self._dataframe.cleaner.add_clean(column_name,value,comparison,drop_column)
+        return self
 
 
 class pyDataSet(DataSet):
@@ -854,7 +904,7 @@ class PandasDataSet(pyDataSet):
             New data to be inserted in dataset.
         """
 
-        if not isinstance(new_data, pandas.DataFrame):
+        if not isinstance(new_data, pandas.DataFrame) and not isinstance(new_data, pandas.Series):
             raise ValueError("Data must be a pandas DataFrame")
 
         self.index = np.append(self.index,

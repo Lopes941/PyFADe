@@ -61,7 +61,7 @@ namespace cfade
              * 
              * @param rows The number of rows in the feature vector.
              */
-            ContinuousMean(int rows=0)
+            ContinuousMean(int rows)
                 : IFeatureCRTP<ContinuousMean>(rows) {}
 
             /**
@@ -157,7 +157,7 @@ namespace cfade
              * @param rows The number of rows in the feature vector.
              */
 
-            ContinuousStandardDeviation(int rows=0)
+            ContinuousStandardDeviation(int rows)
                 : IFeatureCRTP<ContinuousStandardDeviation>(rows) {}
 
             /**

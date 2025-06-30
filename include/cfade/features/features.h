@@ -8,25 +8,10 @@
 #include <unordered_map>
 #include <typeindex>
 #include <stdexcept>
+#include <functional>
 
 
 namespace cfade{
-
-
-    /**
-     * @brief Map of feature names to their types.
-     * 
-     * This map associates each feature name with its corresponding type.
-     * It allows for dynamic type checking and retrieval of feature types
-     * at runtime.
-     * 
-     * This map is used to look up the type of a feature based on its name.
-     * 
-     * @param feature_name The name of the feature.
-     * @return std::type_index The type index of the feature.
-     */
-    std::unordered_map<std::string, std::type_index> feature_type_map;
-
 
     /**
      * @brief Interface for a feature.
@@ -212,5 +197,20 @@ namespace cfade{
              */
             ~IFeatureCRTP()=default;
     };
+
+
+    /**
+     * @brief Map of feature names to their Factories.
+     * 
+     * This map associates each feature name with its corresponding factory.
+     * It allows for dynamic instantiation of IFeature Derived classes.
+     * 
+     * 
+     * @param feature_name The name of the feature.
+     * @return FeatureFactory The corresponding factory for the IFeature with feature_name.
+     */
+    // std::unordered_map<std::string, std::type_index> feature_type_map;
+    using FeatureFactory = std::function<std::shared_ptr<IFeature>(int row)>;
+    extern std::unordered_map<std::string, FeatureFactory> feature_builder_map;
 
 }  // namespace cfade

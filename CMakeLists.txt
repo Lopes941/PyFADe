@@ -53,8 +53,10 @@ set(SOURCE_FILES
     src/pyfade/bindings.cpp
     src/pyfade/cpp/utils.cpp
     src/pyfade/cpp/dataset.cpp
+    src/pyfade/cpp/features.cpp
     src/pyfade/cpp/statistics.cpp
     src/pyfade/cpp/matrix_profile.cpp
+    src/pyfade/cpp/k_profile.cpp
     )
 
 if (HAS_CUDA)
@@ -67,5 +69,5 @@ if (HAS_CUDA)
     target_link_libraries(core PRIVATE CUDA::cufft CUDA::cudart)
 endif()
 
-target_include_directories(core PRIVATE ${PROJECT_SOURCE_DIR}/includes)
+target_include_directories(core PRIVATE ${PROJECT_SOURCE_DIR}/include)
 install(TARGETS core LIBRARY DESTINATION pyfade)
