@@ -6,6 +6,7 @@
 
 #include <iostream>
 #include <memory>
+#include <complex>
 
     // ==========================
     //  Kernels
@@ -31,6 +32,40 @@ __device__ void atomicMin_double_with_index_nan_safe(double* addr_val, int* addr
     atomicExch(addr_idx, idx);
 }
 
+__device__ void run_increment_QT(const double* series,
+                            double* QT,
+                            const double* QT_old, 
+                            const double* QT_first,
+                            const int i,
+                            const int final_size,
+                            const int interval_size){
+
+    int idx = blockIdx.x * blockDim.x + threadIdx.x;
+    if (idx < final_size) {
+        if (idx == 0){
+            QT[idx] = QT_first[i];
+        }else{
+            QT[idx] =   QT_old[idx-1] 
+                        - series[idx-1]*series[i-1] 
+                        + series[idx+interval_size-1]*series[i+interval_size-1];
+        }
+    }
+}
+
+__global__ void increment_QT(const double* series,
+                            double* QT,
+                            const double* QT_old, 
+                            const double* QT_first,
+                            const int i,
+                            const int final_size,
+                            const int interval_size){
+    
+    run_increment_QT(series,QT,QT_old,QT_first,i,final_size,interval_size);
+    
+}
+
+
+
 __global__ void stomp_iteration(const double* series, 
                                 double* QT,
                                 const double* QT_old, 
@@ -48,16 +83,9 @@ __global__ void stomp_iteration(const double* series,
     int idx = blockIdx.x * blockDim.x + threadIdx.x;
     double Dj, den;
 
-
     if (idx < final_size) {
 
-        if (idx == 0){
-            QT[idx] = QT_first[i];
-        }else{
-            QT[idx] =   QT_old[idx-1] 
-                        - series[idx-1]*series[i-1] 
-                        + series[idx+interval_size-1]*series[i+interval_size-1];
-        }
+        run_increment_QT(series,QT,QT_old,QT_first,i,final_size,interval_size);
 
         if (abs(idx - i) >= exclusion_zone_size && (!left_only || idx<i)){
 
@@ -182,6 +210,7 @@ void cuda_STOMP_iterations(const std::shared_ptr<cfade::DataSet> observed_datase
     double *d_mean, *d_series, *d_stds;
     double *D;
     int *I;
+    bool use_odd = true;
 
     int number_of_updates = final_size-start_location;
 
@@ -210,25 +239,49 @@ void cuda_STOMP_iterations(const std::shared_ptr<cfade::DataSet> observed_datase
 
         int current_update = 0;
 
-        distance_profile<<<blocks, threads>>>(d_series,
-                                            QT,
-                                            d_mean,
-                                            d_stds,
-                                            D+current_update,
-                                            I+current_update,
-                                            start_location+current_update,
-                                            final_size,
-                                            interval_size,
-                                            exclusion_zone_size,
-                                            left_only);
-        current_update++;
-
         cudaMemcpy(QT_first, QT+dimension*final_size, final_size * sizeof(double), cudaMemcpyDeviceToDevice );
         cudaMemcpy(QT_odd, QT+dimension*final_size,final_size * sizeof(double), cudaMemcpyDeviceToDevice );
 
+        for(int i=0; i<start_location+1; i++){
+            if(use_odd){
+                increment_QT<<<blocks, threads>>>(d_series,QT_even,QT_odd,QT_first,i,final_size,interval_size);
+                use_odd = false;
+            }else{
+                increment_QT<<<blocks, threads>>>(d_series,QT_odd,QT_even,QT_first,i,final_size,interval_size);
+                use_odd = true;
+            }
+
+        }
+        
+        if(use_odd){
+            distance_profile<<<blocks, threads>>>(d_series,
+                                                QT_odd,
+                                                d_mean,
+                                                d_stds,
+                                                D+current_update,
+                                                I+current_update,
+                                                start_location+current_update,
+                                                final_size,
+                                                interval_size,
+                                                exclusion_zone_size,
+                                                left_only);
+        }else{
+            distance_profile<<<blocks, threads>>>(d_series,
+                                                QT_even,
+                                                d_mean,
+                                                d_stds,
+                                                D+current_update,
+                                                I+current_update,
+                                                start_location+current_update,
+                                                final_size,
+                                                interval_size,
+                                                exclusion_zone_size,
+                                                left_only);
+        }
+        current_update++;
 
         for(; current_update<number_of_updates;current_update++){
-            if (current_update%2){
+            if (use_odd){
                 stomp_iteration<<<blocks, threads>>>(d_series,
                                     QT_even,
                                     QT_odd,
@@ -242,6 +295,7 @@ void cuda_STOMP_iterations(const std::shared_ptr<cfade::DataSet> observed_datase
                                     interval_size,
                                     exclusion_zone_size,
                                     left_only);
+                use_odd = false;
             }else{
                 stomp_iteration<<<blocks, threads>>>(d_series,
                                     QT_odd,
@@ -256,6 +310,7 @@ void cuda_STOMP_iterations(const std::shared_ptr<cfade::DataSet> observed_datase
                                     interval_size,
                                     exclusion_zone_size,
                                     left_only);
+                use_odd = true;
             }
         }
 
@@ -281,6 +336,28 @@ void cuda_STOMP_iterations(const std::shared_ptr<cfade::DataSet> observed_datase
     cudaFree(I);
 
 }
+
+
+
+
+
+std::vector<std::complex<double>> copy_cufftDoubleComplex_to_std_vector(cufftDoubleComplex* d_data, int fft_size) {
+    // Step 1: Allocate host memory
+    std::vector<cufftDoubleComplex> host_data(fft_size);
+
+    // Step 2: Copy from device to host
+    cudaMemcpy(host_data.data(), d_data, fft_size * sizeof(cufftDoubleComplex), cudaMemcpyDeviceToHost);
+
+    // Step 3: Convert to std::complex<double>
+    std::vector<std::complex<double>> result(fft_size);
+    for (int i = 0; i < fft_size; ++i) {
+        result[i] = std::complex<double>(host_data[i].x, host_data[i].y);
+    }
+
+    return result;
+}
+
+
 
 void cuda_convolve(double* d_QT, 
                 const double* series_padded, 
@@ -316,7 +393,6 @@ void cuda_convolve(double* d_QT,
     cufftExecD2Z(plan_fft_Q, d_Q, d_fft_Q);
 
     // Multiplication
-    
     int blocks_mult;
     choose_cuda_parameters(fft_size,blocks_mult,threads);
     multiply_complex<<<blocks_mult, threads>>>(d_fft_series, d_fft_Q, fft_size);

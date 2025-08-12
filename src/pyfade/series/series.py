@@ -1,333 +1,15 @@
 import pandas
 import numpy as np
-from scipy.interpolate import interp1d
+
 from typing import Self
 
-from abc import ABC, abstractmethod
+from abc import abstractmethod, ABC
 
-from .core import DataSet
+from .interpolation import InterpolatorInterface, NumpyInterpolator, Interpolation, Extrapolation
+from .filter import get_filter, DataFilterInterface, FilterType
+from .cleaner import DataCleaner
+from ..core import DataSet
 
-class Interpolation:
-    """
-    Interpolation methods available for use in the InterpolatorInterface.
-
-    This class defines the available interpolation methods as constants.
-
-    Attributes
-    ----------
-    LINEAR : int
-        Linear interpolation method identifier.
-    """
-
-    LINEAR = 1
-
-class Extrapolation:
-    """
-    Extrapolation methods available for use in the InterpolatorInterface.
-
-    This class defines the available extrapolation methods as constants.
-
-    Attributes
-    ----------
-    CONSTANT : int
-        Constant extrapolation method identifier.
-    """
-
-    CONSTANT = 1
-
-class InterpolatorInterface(ABC):
-    """
-    Interpolator interface for interpolating and extrapolating data.
-
-    This interface defines the methods and properties that any interpolator
-    must implement.
-    
-    Properties
-    ----------
-    extrapolation_method: Extrapolation
-        Extrapolation method identifier.
-    interpolation_method: Interpolation
-        Interpolation method identifier.
-
-    Methods
-    -------
-    run_interpolation_extrapolation(data: np.ndarray):
-        Runs the interpolation and extrapolation schemes on the given data.
-        Parameters
-        ----------
-        data: np.ndarray
-            Data to be interpolated.
-
-    See Also
-    --------
-    Interpolation: Enum for interpolation methods.
-    Extrapolation: Enum for extrapolation methods.
-    """
-
-    @property
-    @abstractmethod
-    def extrapolation_method():
-        """
-        Extrapolation: Extrapolation method
-        """
-        pass
-
-    @property
-    @abstractmethod
-    def interpolation_method():
-        """
-        Interpolation: Interpolation method
-        """
-        pass
-
-    @abstractmethod
-    def run_interpolation_extrapolation(data):
-        """
-        Runs the interpolation and extrapolation methods on given data.
-
-        Parameters
-        ----------
-        data: np.ndarray
-            Data to be interpolated. It is operated by reference.
-        """
-        pass
-
-class NumpyInterpolator(InterpolatorInterface):
-    """
-    NumpyInterpolator class that implements the InterpolatorInterface.
-    
-    This class provides methods for interpolating and extrapolating data using numpy and scipy.
-    It uses linear interpolation and constant extrapolation by default.
-
-    Attributes
-    ----------
-    extrapolation_method: Extrapolation
-        Extrapolation method identifier.
-    interpolation_method: Interpolation
-        Interpolation method identifier.
-
-    Methods
-    -------
-    run_interpolation_extrapolation(data: np.ndarray):
-        Runs the interpolation and extrapolation methods on given data.
-        Parameters
-        ----------
-        data: np.ndarray
-            Data to be interpolated. It is operated by reference.
-
-    See Also
-    --------
-    InterpolatorInterface: Interface for interpolators that implement interpolation and extrapolation methods.
-    Interpolation: Enum for interpolation methods.
-    Extrapolation: Enum for extrapolation methods.
-    """
-
-    _last_valid_index=None
-    _last_index_from_previous=None
-    extrapolation_method=Extrapolation.CONSTANT
-    interpolation_method=Interpolation.LINEAR
-
-    def __init__(self):
-        """
-        Initializes the NumpyInterpolator object.
-
-        Sets the extrapolation and interpolation methods to default values.
-        Extrapolation is set to CONSTANT and interpolation is set to LINEAR.
-        """
-         
-        self.extrapolation_method=Extrapolation.CONSTANT
-        self.interpolation_method=Interpolation.LINEAR
-        self._last_valid_index=None
-        self._last_index_from_previous=None
-
-    def run_interpolation_extrapolation(self, data : np.ndarray):
-        """
-        Runs the interpolation and extrapolation methods on given data.
-
-        Parameters
-        ----------
-        data: np.ndarray
-            Data to be interpolated. It is operated by reference.
-            The data must be a 2D array where the first dimension is the number of dimensions
-            and the second dimension is the number of time steps.
-        """
-
-        ndim = data.shape[0]
-        total_index = np.arange(data.shape[1])
-
-
-        if self._last_index_from_previous is None:
-            self._last_index_from_previous = np.zeros(ndim,dtype=int)
-            self._last_valid_index = np.zeros(ndim,dtype=int)
-
-        for dim in range(data.shape[0]):
-
-            indices = np.arange(total_index.size-self._last_valid_index[dim])
-            local_data = data[dim,self._last_valid_index[dim]:]
-
-            good_indices_address, bad_indices_address = self.get_indices(local_data[:],dim)
-            self.get_interpolation(local_data[:],good_indices_address,bad_indices_address,indices,dim)
-            self.get_extrapolation(local_data[:],good_indices_address,indices,dim)
-
-            self._last_index_from_previous[dim] = data.shape[1]-1
-            self._last_valid_index[dim] = total_index[self._last_valid_index[dim]:][good_indices_address][-1]
-
-         
-    def get_indices(self,data:np.ndarray, dim: int) -> tuple[np.ndarray, np.ndarray]:
-        """
-        Gets the indices that must be interpolated/extrapolated.
-
-        Parameters
-        ----------
-        data: np.ndarray
-            Data to be interpolated. It is returned by reference.
-        dim: int
-            Current dimension index.
-
-        Returns
-        -------
-        tuple[np.ndarray, np.ndarray]
-            A tuple containing two boolean arrays:
-            - good_indices_address: Boolean array identifying indices that are not NaN.
-            - bad_indices_address: Boolean array identifying indices that are NaN.
-        """
-
-        
-        if self._last_index_from_previous[dim] == 0:
-            starter_address = np.zeros(0,dtype=bool)
-            new_start = 0
-        else:
-            new_start = self._last_index_from_previous[dim]-self._last_valid_index[dim]+1
-            starter_address = np.zeros(self._last_index_from_previous[dim]-self._last_valid_index[dim]+1,dtype=bool)
-
-            if(np.isfinite(data[0])):
-                starter_address[0] = True
-
-
-        good_indices_address = np.append(starter_address,
-                                         np.isfinite(data[new_start:]))
-                                        
-        bad_indices_address = np.append(np.logical_not(starter_address),
-                                        np.isnan(data[new_start:]))
-        
-        return good_indices_address, bad_indices_address
-
-
-    def get_interpolation(self,
-                          data:np.ndarray, 
-                          good_indices_address: np.ndarray, 
-                          bad_indices_address: np.ndarray, 
-                          indices: np.ndarray, 
-                          dim: int):
-        """
-        Runs the interpolation scheme on data.
-
-        Parameters
-        ----------
-        data: np.ndarray
-            Data to be interpolated. It is operated by reference.
-        good_indices_address: np.ndarray
-            Boolean array identifying indices that are not NaN.
-        bad_indices_address: np.ndarray
-            Boolean array identifying indices that are NaN.
-        indices: np.ndarray
-            Array with indices to be interpolated.
-        dim: int
-            Current dimension index.
-        """
-
-        match self.interpolation_method:
-
-            case Interpolation.LINEAR:
-                func = interp1d(indices[good_indices_address], data[good_indices_address], bounds_error=False, kind='linear')
-
-                data[bad_indices_address] = func(indices[bad_indices_address])
-                 
-
-    def get_extrapolation(self, 
-                          data:np.ndarray, 
-                          good_indices_address: np.ndarray, 
-                          indices: np.ndarray, 
-                          dim: int):
-        """
-        Runs the extrapolation scheme on data.
-
-        Parameters
-        ----------
-        data: np.ndarray
-            Data to be interpolated. It is operated by reference.
-        good_indices_address: np.ndarray
-            Boolean array identifying indices that are not NaN.
-        bad_indices_address: np.ndarray
-            Boolean array identifying indices that are NaN.
-        indices: np.ndarray
-            Array with indices to be interpolated.
-        dim: int
-            Current dimension index.
-        """
-
-        match self.extrapolation_method:
-
-            case Extrapolation.CONSTANT:
-                good_indices_location = indices[good_indices_address]
-                if not good_indices_address[0]:
-                    data[:good_indices_location[0]] = data[good_indices_location[0]]
-                if not good_indices_address[-1]:
-                    data[good_indices_location[-1]:] = data[good_indices_location[-1]]
-
-class DataCleaner():
-
-    def __init__(self):
-        self.column_name = []
-        self.value = []
-        self.comparison = []
-        self.drop_column = []
-    
-    def add_clean(self, column_name, value: object, comparison: str = '=', drop_column=True):
-
-        self.column_name.append(column_name)
-        self.value.append(value)
-        self.drop_column.append(drop_column)
-
-        if comparison not in ['=', '>', '<']:
-            raise AttributeError("Comparison type must be '=', '>' or '<'")
-
-        self.comparison.append(comparison)
-
-    def run_cleaner(self, data: np.ndarray, index: np.ndarray) -> np.ndarray:
-
-        mask = np.ones(data.shape[0],dtype=bool)
-        remove_cols = []
-
-        for i in range(len(self.column_name)):
-
-            col = self.column_name[i]
-            val = self.value[i]
-            comp = self.comparison[i]
-
-            col_idx = np.where(col==index)[0][0]
-            col_data = data[col_idx,:]
-
-            if comp == '=':
-                mask &= (col_data == val)
-            elif comp == '>':
-                mask &= (col_data > val)
-            elif comp == '<':
-                mask &= (col_data < val)
-
-            if self.drop_column[i]:
-                remove_cols.append(col_idx)
-
-        data[:] = data[mask]
-
-        remove_cols = sorted(set(remove_cols), reverse=True)
-        data = np.delete(data, remove_cols, axis=1)
-
-        return data
-
-
-
-# TODO add cleaner and dimensions
 class DataFrame:
     """
     DataFrame object that holds multi-dimensional time series data.
@@ -346,6 +28,10 @@ class DataFrame:
         Object that holds the multi-dimensional time series.
     interpolator: InterpolatorInterface
         Object that holds the interpolation and extrapolation methods.
+    filter: DataFilterInterface
+        Object that holds the filter methods.
+    dimensions: np.ndarray
+        Array that holds the name of each dimension.
 
     Properties
     ----------
@@ -368,9 +54,9 @@ class DataFrame:
 
     interpolator = None
     dataset = None
+    filter = None
     cleaner = None
-    dimensions = None
-
+    
     def __init__(self):
         """
         Initializes the DataFrame object.
@@ -491,9 +177,37 @@ class DataFrame:
 
         old_data = self.dataset.data
         self.interpolator.run_interpolation_extrapolation(old_data[:])
+        if self.filter is not None:
+            self.filter.apply_filter(old_data[:])
         self.cleaner.run_cleaner(old_data[:], self.dataset.index)
 
-
+    def plot(self,\
+            height: float = 3,\
+            width: float = 10,\
+            xlimits: list = None,\
+            ylimits: list = None,\
+            xlabel: str = 'Timestamp',\
+            ylabel: str | list = None,\
+            title: str = None,\
+            fig = None,\
+            axs = None,\
+            style=None,\
+            **kwargs):
+        
+        return plot_data(self.data,\
+                        self.index,\
+                        self.dimensions,\
+                        height,\
+                        width,\
+                        xlimits,\
+                        ylimits,\
+                        xlabel,\
+                        ylabel,
+                        title,\
+                        fig,\
+                        axs,\
+                        style,\
+                        **kwargs)
 
     def insert_data(self, inserted_data: np.ndarray | pandas.DataFrame | pandas.Series):
         """
@@ -522,6 +236,8 @@ class DataFrame:
         old_data = self.dataset.data
         old_data = np.append(old_data,new_data,axis=1)
         self.interpolator.run_interpolation_extrapolation(old_data[:])
+        if self.filter is not None:
+            self.filter.apply_filter(old_data[:])
 
         if isinstance(inserted_data,np.ndarray):
             new_data = old_data[:,-new_data.shape[1]:]
@@ -534,7 +250,6 @@ class DataFrame:
             
         self.cleaner.run_cleaner(new_data,new_index)
         self.dataset.insert(new_data)
-
 
 class DataFrameBuilder:
     """
@@ -562,6 +277,8 @@ class DataFrameBuilder:
         Sets the interpolation method for the DataFrame.
     set_extrapolation(extrapolation: Extrapolation) -> Self:
         Sets the extrapolation method for the DataFrame.
+    set_filter(filter_tyoe: FilterType) -> Self:
+        Sets the filtering technique for the DataFrame.
 
     See Also
     --------
@@ -592,7 +309,7 @@ class DataFrameBuilder:
     2  2.0  6.0
     """
 
-    def __init__(self, data : np.ndarray | pandas.DataFrame | pandas.Series):
+    def __init__(self, data : np.ndarray | pandas.DataFrame | pandas.Series, wavelet_decomposition_level: int = 0):
         """
         Initializes the DataFrameBuilder object with given data.
 
@@ -613,39 +330,46 @@ class DataFrameBuilder:
         ValueError: If the data is not a 1D or 2D array.
         """
 
-        self._dataframe = DataFrame()
-        if isinstance(data,pandas.DataFrame):
-            self._dataframe.dataset = PandasDataSet()
+        if wavelet_decomposition_level == 0:
+            self._dataframe = DataFrame()
             self._dataframe.interpolator = NumpyInterpolator()
             self._dataframe.cleaner = DataCleaner()
-            self._dataframe.dataset.data = data.values.T
-            self._dataframe.dataset.index = data.index
-            self._dataframe.dimensions = data.columns
+            if isinstance(data,pandas.DataFrame):
+                self._dataframe.dataset = PandasDataSet()
+                self._dataframe.dataset.data = data.values.T
+                self._dataframe.dataset.index = data.index
+                self._dataframe.dimensions = data.columns
 
-        elif isinstance(data,pandas.Series):
-            self._dataframe.dataset = PandasDataSet()
-            self._dataframe.interpolator = NumpyInterpolator()
-            self._dataframe.cleaner = DataCleaner()
-            self._dataframe.dataset.data = data.values[np.newaxis,:]
-            self._dataframe.dataset.index = data.index
-            self._dataframe.dimensions = [data.name]
+            elif isinstance(data,pandas.Series):
+                self._dataframe.dataset = PandasDataSet()
+                
+                self._dataframe.dataset.data = data.values[np.newaxis,:]
+                self._dataframe.dataset.index = data.index
+                self._dataframe.dimensions = np.array([data.name])
 
-        elif isinstance(data, np.ndarray):
+            elif isinstance(data, np.ndarray):
 
-            if data.ndim > 2:
-                raise RuntimeError("Data must be 1D or 2D array")
-            if data.ndim == 1:
-                data = data[np.newaxis,:]
+                if data.ndim > 2:
+                    raise RuntimeError("Data must be 1D or 2D array")
+                if data.ndim == 1:
+                    data = data[np.newaxis,:]
 
+                self._dataframe.dataset = NumpyDataSet()
+                self._dataframe.dataset.data = data
+                self._dataframe.dataset.index = np.arange(data.shape[1],dtype=int)
+                self._dataframe.dimensions = np.arange(data.shape[0],dtype=int).astype(str)
+
+            else:
+                raise RuntimeError("Invalid type for data")
+        else:
+            self._dataframe = WaveletDataFrame(wavelet_decomposition_level)
             self._dataframe.dataset = NumpyDataSet()
             self._dataframe.interpolator = NumpyInterpolator()
             self._dataframe.cleaner = DataCleaner()
-            self._dataframe.dataset.data = data
-            self._dataframe.dataset.index = np.arange(data.shape[1],dtype=int)
-            self._dataframe.dimensions = np.empty(data.shape[0],dtype=str)
-
-        else:
-            raise RuntimeError("Invalid type for data")
+            if isinstance(data,pandas.DataFrame):
+                self._dataframe.dataset.data = data.values.T
+                
+                
         
     def build(self) -> DataFrame:
         """
@@ -711,11 +435,17 @@ class DataFrameBuilder:
 
         self._dataframe.interpolator.extrapolation_method = extrapolation
         return self
+    
+    def set_filter(self, filter_type: FilterType, *args, **kwargs):
+        """
+        TODO: Write.
+        """
+        self._dataframe.filter = get_filter(filter_type, *args, **kwargs)
+        return self
 
     def add_clean(self, column_name, value: object, comparison: str = '=', drop_column=True) ->Self:
         self._dataframe.cleaner.add_clean(column_name,value,comparison,drop_column)
         return self
-
 
 class pyDataSet(DataSet):
     """
@@ -910,3 +640,67 @@ class PandasDataSet(pyDataSet):
         self.index = np.append(self.index,
                                new_data.index)
         self.insert_data(new_data.values.T)
+
+
+HSPACE = 0.2
+def plot_data(dataset: np.ndarray,\
+            index: np.ndarray,\
+            labels: np.ndarray,\
+            height: float,\
+            width: float,\
+            xlimits: list,\
+            ylimits: list,\
+            xlabel: str,\
+            ylabel: str | list,\
+            title: str,\
+            fig,\
+            axs,\
+            style,\
+            **kwargs):
+    """
+    """
+    
+    import matplotlib
+    import matplotlib.pyplot as plt
+
+    # Extracting values
+    num_dim = dataset.shape[0]
+    
+    # Creating window and axes
+    second_plot = False
+    if fig is None or axs is None:
+        fig, axs = plt.subplots(num_dim, sharex=True, gridspec_kw={'hspace': HSPACE},figsize=[width,height*num_dim])
+        if style is None:
+            style = 'b-'
+        if num_dim == 1:
+            axs = [axs]
+    else:
+        second_plot = True
+        axs = [ax.twinx() for ax in axs]
+        if style is None:
+            style = 'r-'
+
+    # Setting the limits of the axes
+    if xlimits is None:
+        xlimits = [index.min(), index.max()]
+
+    if ylabel is not None:
+        if isinstance(ylabel, str):
+            labels = np.array([ylabel]*num_dim)
+        else:
+            if len(ylabel) != num_dim:
+                raise AttributeError("Number of terms in ylabel must be equal to the dimension size")
+            labels = ylabel
+
+    # Plotting data
+    for k in range(num_dim):
+        axs[k].plot(index,dataset[k,:],style, **kwargs)
+        if ylimits is not None:
+            axs[k].set_ylim(ylimits)
+        axs[k].grid(not second_plot)
+        axs[k].set_ylabel(labels[k])
+        axs[k].set_xlim(xlimits)
+        axs[k].set_xlabel(xlabel)
+    axs[0].set_title(title)
+
+    return fig, axs

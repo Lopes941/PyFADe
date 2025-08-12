@@ -1,8 +1,10 @@
-import pandas as pd
+
 import numpy as np
 
-from .series import DataFrame
-from .core import IFeatureGroup
+from ..core import IFeatureGroup, ContinuousStatistics
+from ..features import Features
+from ..series.series import DataFrame
+
 
 class PythonStatistics(IFeatureGroup):
 
@@ -12,20 +14,24 @@ class PythonStatistics(IFeatureGroup):
     
     @staticmethod
     def static_feature_names():
-        return ['meanpy','stdpy']
+        return [Features.Meanpy.value,
+                Features.Stdpy.value]
     
     @staticmethod
     def static_requirements():
-        return ['ContinuousStatistics']
+        return [ContinuousStatistics.static_name()]
     
     @staticmethod
     def static_parameters():
         return []
 
-    def __init__(self, dataset: DataFrame, requirements: list[IFeatureGroup]):
+    def __init__(self, dataset, requirements: list[IFeatureGroup]):
         super().__init__()
-        self.meanpy = np.empty((dataset.data.ndim,0),dtype=float)
-        self.stdpy = np.empty((dataset.data.ndim,0),dtype=float)
+
+        from ..features.pystatistics import Meanpy, Stdpy
+
+        self.meanpy: Meanpy = Meanpy()
+        self.stdpy: Stdpy = Stdpy()
 
         self.cont_mean = requirements[0]
 
@@ -40,16 +46,14 @@ class PythonStatistics(IFeatureGroup):
     
     def parameters(self):
         return PythonStatistics.static_parameters()
-    
 
     def get_feature(self, name) -> np.ndarray:
         features = self.feature_names()
         if name == features[0]:
-            return self.meanpy
+            return self.meanpy.feature
         elif name == features[1]:
-            return self.stdpy
+            return self.stdpy.feature
         
-    def update(self, dataset: DataFrame, window_size: int):
-        # window = np.lib.stride_tricks.sliding_window_view(dataset.data, window_size,axis=1)
-        self.meanpy = self.cont_mean.means
-        self.stdpy = self.cont_mean.stds
+    def update(self, dataset, window_size: int):
+        self.meanpy.feature = self.cont_mean.means
+        self.stdpy.feature = self.cont_mean.stds

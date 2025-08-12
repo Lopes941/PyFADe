@@ -51,6 +51,7 @@ install(FILES "${CMAKE_CURRENT_BINARY_DIR}/cuda_config.py"
 
 set(SOURCE_FILES
     src/pyfade/bindings.cpp
+    src/pyfade/cpp/cpu_funcs.cpp
     src/pyfade/cpp/utils.cpp
     src/pyfade/cpp/dataset.cpp
     src/pyfade/cpp/features.cpp

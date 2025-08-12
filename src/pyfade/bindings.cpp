@@ -91,6 +91,44 @@ class pyIDataFrameObserverTrampoline: public cfade::IDataSetObserver{
 
 };
 
+class pyFeatureTrampoline: public cfade::IFeature{
+
+    private:
+
+        py::array_t<double> feature_vector;
+
+
+    public:
+
+        pyFeatureTrampoline(){
+
+            py::module_ numpy = py::module_::import("numpy");
+
+            feature_vector = numpy.attr("empty")(0);
+        }
+
+        const std::string& name() const override{
+            PYBIND11_OVERRIDE_PURE(
+                const std::string&,
+                cfade::IFeature,
+                name
+            );
+        }
+
+        cfade::VariantVec get() override{
+            PYBIND11_OVERRIDE_PURE(
+                cfade::VariantVec,
+                cfade::IFeature,
+                get
+            );
+        }
+
+        py::array_t<double>& get_feature(){
+            return feature_vector;
+        }
+
+};
+
 class pyFeatureGroupTrampoline: public cfade::IFeatureGroup{
 
     public:
@@ -150,7 +188,26 @@ class pyFeatureGroupTrampoline: public cfade::IFeatureGroup{
 
 };
 
+class pyFeatureGroupParameterTrampoline: public cfade::IFeatureGroupParameter{
 
+    const std::string& name()const override{
+        PYBIND11_OVERRIDE_PURE(
+            const std::string&,
+            cfade::IFeatureGroupParameter,
+            name
+        );
+    }
+
+    void set(cfade::VariantTypes val) override{
+        PYBIND11_OVERRIDE_PURE(
+            void,
+            cfade::IFeatureGroupParameter,
+            set,
+            val
+        );
+    }
+
+};
 
 PYBIND11_MODULE(core, handle) {
     handle.doc() = "A time-series window calculation module";
@@ -189,16 +246,62 @@ PYBIND11_MODULE(core, handle) {
         .def("remove_observer", &cfade::DataSet::remove_observer)
         ;}
 
-    {py::class_<cfade::IDataSetObserver,pyIDataFrameObserverTrampoline,std::shared_ptr<cfade::IDataSetObserver>>(handle,"IDataSetObserver")
+    {py::class_<cfade::IDataSetObserver,pyIDataFrameObserverTrampoline,std::shared_ptr<cfade::IDataSetObserver>>
+        (handle,"IDataSetObserver")
         
-    
         .def(py::init<>())
 
         .def("update", &cfade::IDataSetObserver::update)
         ;
     }
     
-    {py::class_<cfade::IFeatureGroup,pyFeatureGroupTrampoline,std::shared_ptr<cfade::IFeatureGroup>>(handle,"IFeatureGroup")
+    {py::class_<cfade::IFeature,pyFeatureTrampoline,std::shared_ptr<cfade::IFeature>>
+        (handle,"IFeature")
+
+        .def(py::init<>())
+
+        .def_property("feature",
+                [](cfade::IFeature& self) -> py::array_t<double> {
+                    auto* ptr = dynamic_cast<pyFeatureTrampoline*>(&self);
+                    if (!ptr) throw std::runtime_error("Invalid type: expected pyFeatureTrampoline");
+                    return ptr->get_feature();  // returns by reference, OK since py::array_t is ref-counted
+                },
+
+                // Setter
+                [](cfade::IFeature& self, const py::array_t<double>& new_array) {
+                    auto* ptr = dynamic_cast<pyFeatureTrampoline*>(&self);
+                    if (!ptr) throw std::runtime_error("Invalid type: expected pyFeatureTrampoline");
+                    ptr->get_feature() = new_array;
+                },
+    
+                py::return_value_policy::reference_internal
+            )
+
+        .def("name", 
+            [](cfade::IFeature& self){
+                return self.name();
+            })
+
+        .def("get",
+            [](cfade::IFeature& self){
+                auto* trampoline = dynamic_cast<pyFeatureTrampoline*>(&self);
+                if (!trampoline) throw std::runtime_error("Invalid feature type");
+                auto& arr = trampoline->get_feature();
+                return arr.attr("size");
+            })
+
+        .def("increase_cols",
+            [](cfade::IFeature& self, const int added_size){
+                auto* trampoline = dynamic_cast<pyFeatureTrampoline*>(&self);
+                if (!trampoline) throw std::runtime_error("Invalid feature type");
+                auto& arr = trampoline->get_feature();
+                arr.attr("resize")(arr.attr("size").cast<int>()+added_size);
+            })
+        ;
+    }
+
+    {py::class_<cfade::IFeatureGroup,pyFeatureGroupTrampoline,std::shared_ptr<cfade::IFeatureGroup>>
+        (handle,"IFeatureGroup")
 
         .def(py::init<>())
 
@@ -233,7 +336,64 @@ PYBIND11_MODULE(core, handle) {
         ;
     }
 
-    {py::class_<cfade::ContinuousStatistics,cfade::IFeatureGroup,std::shared_ptr<cfade::ContinuousStatistics>>(handle,"ContinuousStatistics")
+    {py::class_<cfade::IFeatureGroupParameter,pyFeatureGroupParameterTrampoline,std::shared_ptr<cfade::IFeatureGroupParameter>>
+        (handle,"IFeatureGroupParameter")
+
+        .def(py::init<>())
+
+        .def("set", &cfade::IFeatureGroupParameter::set)
+
+        .def("name", 
+            [](const cfade::IFeatureGroupParameter& self){
+                    return self.name();
+            })
+        ;
+
+    }
+
+    {py::class_<cfade::UseCudaParam,std::shared_ptr<cfade::UseCudaParam>>
+        (handle,"UseCudaParam")
+        .def(py::init<>())
+        .def("set", &cfade::UseCudaParam::set)
+        .def("get", &cfade::UseCudaParam::get)
+        .def_static("static_name", &cfade::UseCudaParam::static_name);
+    }
+
+    {py::class_<cfade::LeftOnlyParam,std::shared_ptr<cfade::LeftOnlyParam>>
+        (handle,"LeftOnlyParam")
+        .def(py::init<>())
+        .def("set", &cfade::LeftOnlyParam::set)
+        .def("get", &cfade::LeftOnlyParam::get)
+        .def_static("static_name", &cfade::LeftOnlyParam::static_name);
+    }
+
+    {py::class_<cfade::SkipStartParam,std::shared_ptr<cfade::SkipStartParam>>
+        (handle,"SkipStartParam")
+        .def(py::init<>())
+        .def("set", &cfade::SkipStartParam::set)
+        .def("get", &cfade::SkipStartParam::get)
+
+        .def_static("static_name", &cfade::SkipStartParam::static_name);
+    }
+
+    {py::class_<cfade::ExclusionZoneRatioParam,std::shared_ptr<cfade::ExclusionZoneRatioParam>>
+        (handle,"ExclusionZoneRatioParam")
+        .def(py::init<>())
+        .def("set", &cfade::ExclusionZoneRatioParam::set)
+        .def("get", &cfade::ExclusionZoneRatioParam::get)
+        .def_static("static_name", &cfade::ExclusionZoneRatioParam::static_name);
+    }
+
+    {py::class_<cfade::QuantileParam,std::shared_ptr<cfade::QuantileParam>>
+        (handle,"QuantileParam")
+        .def(py::init<>())
+        .def("set", &cfade::QuantileParam::set)
+        .def("get", &cfade::QuantileParam::get)
+        .def_static("static_name", &cfade::QuantileParam::static_name);
+    }
+
+    {py::class_<cfade::ContinuousStatistics,cfade::IFeatureGroup,std::shared_ptr<cfade::ContinuousStatistics>>
+        (handle,"ContinuousStatistics")
 
         .def(py::init<std::shared_ptr<cfade::DataSet>, 
             std::vector<std::shared_ptr<cfade::IFeatureGroup>>>())
@@ -255,7 +415,8 @@ PYBIND11_MODULE(core, handle) {
         ;
     }
 
-    {py::class_<cfade::MatrixProfile,cfade::IFeatureGroup,std::shared_ptr<cfade::MatrixProfile>>(handle,"MatrixProfile")
+    {py::class_<cfade::MatrixProfile,cfade::IFeatureGroup,std::shared_ptr<cfade::MatrixProfile>>
+        (handle,"MatrixProfile")
 
         .def(py::init<std::shared_ptr<cfade::DataSet>, 
             std::vector<std::shared_ptr<cfade::IFeatureGroup>>>())
@@ -278,7 +439,8 @@ PYBIND11_MODULE(core, handle) {
         ;
     }
 
-    {py::class_<cfade::KProfile,cfade::IFeatureGroup,std::shared_ptr<cfade::KProfile>>(handle,"KProfile")
+    {py::class_<cfade::KProfile,cfade::IFeatureGroup,std::shared_ptr<cfade::KProfile>>
+        (handle,"KProfile")
 
         .def(py::init<std::shared_ptr<cfade::DataSet>, 
             std::vector<std::shared_ptr<cfade::IFeatureGroup>>>())

@@ -4,36 +4,10 @@ from scipy.interpolate import interp1d
 from enum import Enum
 from typing import  Self
 
-from .series import DataFrame
-from .features import PythonStatistics
-from .core import IDataSetObserver, IFeatureGroup, ContinuousStatistics, MatrixProfile, KProfile
-
-"""
-List of all feature groups that can be added to Window.
-
-ANY NEW FEATUREGROUPS DEFINED BY THE USER MUST BE ADDED HERE, AND ONLY HERE!
-"""
-FEATURE_GROUP_LIST = [ContinuousStatistics,
-                      PythonStatistics,
-                      MatrixProfile,
-                      KProfile]
-
-"""
-FeatureGroups: Enum with feature groups names.
-feature_group_callable: Dictionary with callable classes.
-feature_group_requirements: Dictionary with the requirements from each feature group
-"""
-FeatureGroups = Enum(
-    'FeatureGroups',
-    {
-        cls.__name__: cls.static_name()
-        for cls in FEATURE_GROUP_LIST
-    })
-feature_group_callable = {}
-feature_group_requirements = {}
-for feature in FEATURE_GROUP_LIST:
-    feature_group_callable[feature.static_name()] = feature
-    feature_group_requirements[feature.static_name()] = feature.static_requirements()
+from ..series.series import DataFrame, plot_data
+from ..features import Features
+from ..group import FeatureGroups, feature_group_requirements, feature_group_callable
+from ..core import IDataSetObserver, IFeatureGroup
 
 
 
@@ -132,15 +106,27 @@ class Window(IDataSetObserver):
 
         added_feature_group.update(self.observed_dataframe.dataset,self.window_size)
         self.dict_of_feature_groups[added_feature_group.name()] = added_feature_group
+
+    def _remove_feature_group(self, removed_feature_group: IFeatureGroup):
+        """
+        Removes a FeatureGroup object to this window, adding it to the automatic update scheme.
+
+        See Also
+        --------
+        FeatureGroupBuilder: Builder class for FeatureGroups within window.
+        IFeatureGroup (C++): Interface for FeatureGroups.
+        """
+        del self.dict_of_feature_groups[removed_feature_group.name()]
+        del removed_feature_group
         
 
-    def get_feature(self,feature_name: str) -> np.ndarray:
+    def get_feature(self,feature_name: Features | str) -> np.ndarray:
         """
         Gets the requested feature by name.
 
         Parameters
         ----------
-        feature_name: str
+        feature_name: Features
             Name of the requested feature.
 
         Returns
@@ -151,14 +137,52 @@ class Window(IDataSetObserver):
         ------
         KeyError: If the feature name is not found in this Window.
         """
-        
+
+        if isinstance(feature_name,Features):
+            value = feature_name.value
+        else:
+            value = feature_name
+
         for group in self.dict_of_feature_groups.values():
             names = group.feature_names()
             for name in names:
-                if name == feature_name:
+                if name == value:
                     return group.get_feature(name)
                 
-        raise KeyError(f"Feature '{feature_name}' not found in any feature group.")
+        raise KeyError(f"Feature '{value}' not found in any feature group.")
+
+    def plot_feature(self,\
+            feature_name: str,\
+            height: float = 3,\
+            width: float = 10,\
+            xlimits: list = None,\
+            ylimits: list = None,\
+            xlabel: str = 'Timestamp',\
+            ylabel: str | list = None,\
+            title: str = None,\
+            fig = None,\
+            axs = None,\
+            style=None,\
+            **kwargs):
+        
+        labels = self.observed_dataframe.dimensions
+        if feature_name in [Features.KProfileInd, Features.KProfileVal, Features.WaveletKP]:
+            labels = np.array([f'{k}-KDP' for k in range(1,self.observed_dataframe.dataset.ndim+1)])
+        
+        return plot_data(self.get_feature(feature_name),\
+                        self.observed_dataframe.index[:-self.window_size+1],\
+                        labels,\
+                        height,\
+                        width,\
+                        xlimits,\
+                        ylimits,\
+                        xlabel,\
+                        ylabel,\
+                        title,\
+                        fig,\
+                        axs,\
+                        style,\
+                        **kwargs)
 
     @property
     def mean(self) -> np.ndarray:
@@ -166,14 +190,14 @@ class Window(IDataSetObserver):
         np.ndarray : rolling mean of time-series.
         """
 
-        return self.get_feature('mean')
+        return self.get_feature(Features.Mean)
         
     @property
     def stddev(self):
         """
         np.ndarray : rolling standard deviation of time-series.
         """
-        return self.get_feature('stddev')
+        return self.get_feature(Features.StdDev)
     
     @property
     def mp(self):
@@ -181,7 +205,7 @@ class Window(IDataSetObserver):
         np.ndarray : Matrix Profile values for each time-series.
         """
 
-        return self.get_feature('matrix_profile_value')
+        return self.get_feature(Features.MatProfileVal)
     
     @property
     def mp_ind(self):
@@ -189,7 +213,7 @@ class Window(IDataSetObserver):
         np.ndarray : Matrix Profile closest index for each time-series.
         """
 
-        return self.get_feature('matrix_profile_index')
+        return self.get_feature(Features.MatProfileInd)
     
     @property
     def kp(self):
@@ -197,7 +221,7 @@ class Window(IDataSetObserver):
         np.ndarray : K-Dimensional Profile values.
         """
 
-        return self.get_feature('k_profile_value')
+        return self.get_feature(Features.KProfileVal)
     
     @property
     def kp_ind(self):
@@ -205,7 +229,7 @@ class Window(IDataSetObserver):
         np.ndarray : K-Dimensional Profile sorted highest dimension index.
         """
 
-        return self.get_feature('k_profile_index')
+        return self.get_feature(Features.KProfileInd)
 
     @property
     def index(self):
@@ -385,7 +409,7 @@ class FeatureGroupBuilder:
     [ 4.5  5.5 ]]
     """
 
-    def __init__(self, feature_group_name, parent_window: Window):
+    def __init__(self, feature_group_name, parent_window: Window, replace:bool = False):
         """
         Initializes the FeatureGroupBuilder class, to build a feature by its name and add to the parent_window.
 
@@ -404,27 +428,44 @@ class FeatureGroupBuilder:
         
         """
 
+
         if isinstance(feature_group_name,FeatureGroups):
             if feature_group_name not in FeatureGroups:
                 raise AttributeError(f"Feature Group {feature_group_name.value} not found.")
             feature_group_name = feature_group_name.value
 
+        self.requirements = []
+        self.parameters = []
+        self.again = False
+        self.feature_group_name = feature_group_name
+
         self.parent = parent_window
         if feature_group_name in self.parent.dict_of_feature_groups.keys():
-            print("Feature already present, not adding again")
-            self._feature_group = None
-            return
+            if not replace:
+                print("Feature already present, not adding again")
+                self._feature_group = None
+                self.again = True
+            else:
+                self.parent._remove_feature_group(self.parent.dict_of_feature_groups[feature_group_name])
         
-        requirements = []
-        for requirement in feature_group_requirements[feature_group_name]:
+        
+
+
+    def build_requirements(self):
+
+        for requirement in feature_group_requirements[self.feature_group_name]:
 
             if requirement not in self.parent.dict_of_feature_groups.keys():
                 feature_builder = FeatureGroupBuilder(requirement,self.parent)
+
+                for parameter_name, parameter_value in self.parameters[:]:
+                    if(parameter_name in feature_group_requirements[requirement]):
+                        feature_builder.set_parameter(parameter_name,parameter_value)
+                        self.parameters.remove((parameter_name,parameter_value))
                 feature_builder.build()
                 
-            requirements.append(self.parent.dict_of_feature_groups[requirement])
+            self.requirements.append(self.parent.dict_of_feature_groups[requirement])
 
-        self._feature_group = feature_group_callable[feature_group_name](self.parent.observed_dataframe.dataset, requirements)
 
     def build(self):
         """
@@ -433,7 +474,13 @@ class FeatureGroupBuilder:
         This method adds the built FeatureGroup into the Window, setting up automatic updates.
         """
 
-        if self._feature_group is not None:
+        if not self.again:
+
+            self.build_requirements()
+            self._feature_group = feature_group_callable[self.feature_group_name](self.parent.observed_dataframe.dataset, self.requirements)
+            for parameter_name, parameter_value in self.parameters:
+                self._feature_group.set_parameter(parameter_name,parameter_value)
+
             self.parent._add_feature_group(self._feature_group)
             self._feature_group = None
 
@@ -457,7 +504,13 @@ class FeatureGroupBuilder:
             For method chaining.
         """
 
-        self._feature_group.set_parameter(parameter_name,parameter_value)
+        self.parameters.append((parameter_name,parameter_value))
+        
         return self
 
+    def set_parameters(self, new_parameters: dict):
 
+        for parameter_name, parameter_value in new_parameters.items():
+            self.set_parameter(parameter_name,parameter_value)
+
+        return self

@@ -49,6 +49,7 @@ namespace cfade{
              * @return VariantVec The feature vector.
              */
             virtual VariantVec get() =0;
+
     };
 
     /**
@@ -82,7 +83,7 @@ namespace cfade{
              *  
              * @return const std::string& Name of the feature.
              */
-            inline const std::string& name() const override{
+            inline const std::string& name() const final{
                 return Derived::static_name();
             } 
 
@@ -161,7 +162,7 @@ namespace cfade{
              * 
              * @return VariantVec The feature vector.
              */
-            inline VariantVec get() override{
+            inline VariantVec get() final{
                 return feature_vector;
             }
 

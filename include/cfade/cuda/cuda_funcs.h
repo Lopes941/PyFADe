@@ -40,8 +40,7 @@ void cuda_STOMP_iterations(const std::shared_ptr<cfade::DataSet> observed_datase
 /**
  * @brief Runs the convolution from the data with its first window;
  * 
- * Runs the matrix profile of a timeseries using CUDA. Automatically fills the MP and inds_MP
- * variables, which are changed in-place.
+ * Runs the convolution of the series with the window.
  * 
  * @param d_QT Convolution vector on Device.
  * @param series_padded Dataset with padded zeros.

@@ -1,8 +1,9 @@
-
+#include <cfade/utils/utils.h>
 #include <cfade/groups/groups.h>
 #include <cfade/groups/matrix_profile.h>
 #include <cfade/features/features.h>
 #include <cfade/features/matrix_profile.h>
+#include <cfade/core/cpu_funcs.h>
 
 #include <vector>
 #include <memory>
@@ -11,6 +12,8 @@
 #include <variant>
 #include <algorithm>
 #include <numeric>
+
+#include <iostream>
 
 
 #ifdef USE_CUDA
@@ -26,7 +29,6 @@ namespace cfade{
                             const std::shared_ptr<VectorGroup<double>> means,
                             const std::shared_ptr<VectorGroup<double>> stds,
                             int window_size,
-                            int start_loc,
                             bool use_cuda);
 
     void run_iterations(const std::shared_ptr<cfade::DataSet> observed_dataset,
@@ -42,12 +44,7 @@ namespace cfade{
                         const bool left_only,
                         const bool use_cuda);
 
-    std::vector<int> argsort_descending(const double* data, const int size);
 
-
-    // ===============
-    // MatrixProfile Class
-    // ===============
 
     MatrixProfile::MatrixProfile(const std::shared_ptr<DataSet>& observed_dataset,
                                 const std::vector<std::shared_ptr<IFeatureGroup>>& dependencies):
@@ -103,6 +100,7 @@ namespace cfade{
         }
         
         int start_loc = matrix_profile->get_length();
+
         int final_size = observed_dataset->get_length() - window_size + 1;
 
         if(skip_start.get()==-1)
@@ -128,7 +126,6 @@ namespace cfade{
                                     means,
                                     stds,
                                     window_size,
-                                    start_loc,
                                     use_cuda.get());
 
         run_iterations(observed_dataset, 
@@ -212,26 +209,65 @@ namespace cfade{
                             const std::shared_ptr<VectorGroup<double>> means,
                             const std::shared_ptr<VectorGroup<double>> stds,
                             int window_size,
-                            int start_loc,
                             bool use_cuda){
 
         #ifdef USE_CUDA
         if (use_cuda){
-            return std::make_shared<QTDataCUDA>(observed_dataset, means, stds, window_size, start_loc);
+            return std::make_shared<QTDataCUDA>(observed_dataset, means, stds, window_size);
         }
         #endif
+        // return std::make_shared<QTDataCPU>(observed_dataset, means, stds, window_size);
         
         // TODO
 
     }
 
+    QTDataCPU::QTDataCPU(const std::shared_ptr<DataSet> observed_dataset,
+                        const std::shared_ptr<VectorGroup<double>> means,
+                        const std::shared_ptr<VectorGroup<double>> stds,
+                        int window_size){
+
+        double * ad_QT = new double[means->total_size()];
+        cudaMalloc((void**) &d_QT, sizeof(double) * means->total_size());
+
+        for (int i=0; i<means->total_size();i++){
+            ad_QT[i] = 0;
+        }
+
+        // Getting flipped first interval padded
+        int padded_size = observed_dataset->get_length() + window_size-1;
+        int mp_size = means->cols;
+        std::vector<double> Q_padded(padded_size,0.0f);
+        std::vector<double> series_padded(padded_size,0.0f);
+
+        for(int dimension=0; dimension<observed_dataset->get_dimension(); dimension++){
+
+            for (int i=0; i<window_size; i++){
+                Q_padded[i] = observed_dataset->at(dimension,window_size-1-i);
+            }
+
+            for(int i=0;i<observed_dataset->get_length(); i++){
+                series_padded[i] = observed_dataset->at(dimension,i);
+            }
+
+            cpu_convolve(ad_QT+mp_size*dimension, series_padded.data(), Q_padded.data(), padded_size, window_size,mp_size);
+        }
+
+        cudaMemcpy(d_QT,ad_QT, sizeof(double)* means->total_size(), cudaMemcpyHostToDevice);
+        delete[] ad_QT;
+    }
+                        
+
+    QTDataCPU::~QTDataCPU(){
+        // if(d_QT) delete[] d_QT;
+        if(d_QT) cudaFree(d_QT);
+    }
 
     #ifdef USE_CUDA
         QTDataCUDA::QTDataCUDA(const std::shared_ptr<DataSet> observed_dataset,
                                 const std::shared_ptr<VectorGroup<double>> means,
                                 const std::shared_ptr<VectorGroup<double>> stds,
-                                int window_size,
-                                int start_loc){
+                                int window_size){
 
 
             cudaMalloc((void**) &d_QT, sizeof(double) * means->total_size());
@@ -245,7 +281,7 @@ namespace cfade{
             for(int dimension=0; dimension<observed_dataset->get_dimension(); dimension++){
 
                 for (int i=0; i<window_size; i++){
-                    Q_padded[i] = observed_dataset->at(dimension,window_size-1-i + start_loc);
+                    Q_padded[i] = observed_dataset->at(dimension,window_size-1-i);
                 }
 
                 for(int i=0;i<observed_dataset->get_length(); i++){

@@ -508,6 +508,48 @@ namespace cfade{
     };
 
     /**
+     * @brief Implementation of QT data for CPU.
+     * 
+     * This class provides a CPU implementation of the QT data interface.
+     */
+    class QTDataCPU: public QTDataInterface{
+
+        public:
+
+            /**
+             * @brief Default constructor for QTDataCPU.
+             * This constructor initializes the QT data CUDA object with default values.
+             * It is intended to be used when no specific parameters are provided.
+             */
+            QTDataCPU()=default; 
+
+            /**
+             * @brief Parameterized constructor for QTDataCPU.
+             * 
+             * This constructor initializes the QT data object with the provided dataset, means, and standard deviations.
+             * It is intended to be used when specific parameters are provided for the QT data.
+             * 
+             * @param observed_dataset The dataset to use for the QT data.
+             * @param means The means of the dataset.
+             * @param stds The standard deviations of the dataset.
+             * @param window_size The size of the window to use for the QT data.
+             */
+            QTDataCPU(const std::shared_ptr<DataSet> observed_dataset,
+                    const std::shared_ptr<VectorGroup<double>> means,
+                    const std::shared_ptr<VectorGroup<double>> stds,
+                    int window_size);
+
+            /**
+             * @brief Default destructor for QTDataCPU.
+             * 
+             * This destructor cleans up the QT data object, releasing any resources allocated during its lifetime.
+             */
+            ~QTDataCPU();
+
+    };
+
+
+    /**
      * @brief Implementation of QT data for CUDA.
      * 
      * This class provides a CUDA-specific implementation of the QT data interface.
@@ -533,13 +575,11 @@ namespace cfade{
              * @param means The means of the dataset.
              * @param stds The standard deviations of the dataset.
              * @param window_size The size of the window to use for the QT data.
-             * @param start_loc The starting location for the QT data.
              */
             QTDataCUDA(const std::shared_ptr<DataSet> observed_dataset,
                                 const std::shared_ptr<VectorGroup<double>> means,
                                 const std::shared_ptr<VectorGroup<double>> stds,
-                                int window_size,
-                                int start_loc);
+                                int window_size);
 
             /**
              * @brief Default destructor for QTDataCUDA.
