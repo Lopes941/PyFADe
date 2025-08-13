@@ -520,8 +520,19 @@ class pyDataSet(DataSet):
         new_data:
             New data to be inserted in dataset.
         """
-
         pass
+
+    @abstractmethod
+    def __getitem__(self, key):
+        """
+        Retrieves data from a given row or (row,column).
+
+        Returns
+        ----------
+        data: data from said column or row
+        """
+        pass
+
 
 class NumpyDataSet(pyDataSet):
     """
@@ -564,6 +575,25 @@ class NumpyDataSet(pyDataSet):
         
         self.index = np.arange(0)
         super().__init__()
+
+    def __getitem__(self, key):
+        """
+        Retrieves data from a given row or (row,column).
+
+        Returns
+        ----------
+        data: data from said column or row
+        """
+
+        if isinstance(key,tuple) and len(key) == 2:
+            row, col = key
+            return self.data[row,col]
+
+        elif isinstance(key,int) or isinstance(key,np.ndarray) or isinstance(key,list):
+            return self.data[key,:]
+        
+        else:
+            raise RuntimeError("Inccorect input for key, must be 2D tuple or int.")
 
     def insert(self, new_data: np.ndarray):
         """
@@ -623,6 +653,26 @@ class PandasDataSet(pyDataSet):
          
         self.index = np.arange(0)
         super().__init__()
+
+    def __getitem__(self, key):
+        """
+        Retrieves data from a given row or (row,column).
+
+        Returns
+        ----------
+        data: data from said column or row
+        """
+
+        if isinstance(key,tuple) and len(key) == 2:
+            row, col = key
+            return self.data[row,col]
+
+        elif isinstance(key,int) or isinstance(key,np.ndarray) or isinstance(key,list):
+            return self.data[key,:]
+    
+        
+        else:
+            raise RuntimeError("Inccorect input for key, must be 2D tuple or int.")
 
     def insert(self, new_data: pandas.DataFrame):
         """
