@@ -744,6 +744,7 @@ def plot_data(dataset: np.ndarray,\
 
     # Plotting data
     for k in range(num_dim):
+
         axs[k].plot(index,dataset[k,:],style, **kwargs)
         if ylimits is not None:
             axs[k].set_ylim(ylimits)

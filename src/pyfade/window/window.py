@@ -10,7 +10,7 @@ from ..group import FeatureGroups, feature_group_requirements, feature_group_cal
 from ..core import IDataSetObserver, IFeatureGroup
 
 
-
+HSPACE = 0.2
 class Window(IDataSetObserver):
     """
     Window object that holds FeatureGroup data that automatically updates when the dataset changes.
@@ -160,6 +160,7 @@ class Window(IDataSetObserver):
             xlabel: str = 'Timestamp',\
             ylabel: str | list = None,\
             title: str = None,\
+            fill_na: float = None,\
             fig = None,\
             axs = None,\
             style=None,\
@@ -169,8 +170,17 @@ class Window(IDataSetObserver):
         if feature_name in [Features.KProfileInd, Features.KProfileVal, Features.WaveletKP]:
             labels = np.array([f'{k}-KDP' for k in range(1,self.observed_dataframe.dataset.ndim+1)])
         
-        return plot_data(self.get_feature(feature_name),\
-                        self.observed_dataframe.index[:-self.window_size+1],\
+        data = self.get_feature(feature_name)
+        index = self.observed_dataframe.index[:-self.window_size+1]
+        
+
+        if fill_na is not None:
+            res_data = pd.DataFrame(data.T,index).resample('h').mean().fillna(0)
+            data = res_data.values.T
+            index = res_data.index
+        
+        return plot_data(data,\
+                        index,\
                         labels,\
                         height,\
                         width,\
@@ -183,6 +193,67 @@ class Window(IDataSetObserver):
                         axs,\
                         style,\
                         **kwargs)
+    
+    
+    def plot_color(self,\
+            feature_name: str,\
+            start:int = 0,\
+            colormap = 'Reds',\
+            scale = 'square',\
+
+            height: float = 3,\
+            width: float = 10,\
+            xlabel: str = 'Timestamp',\
+            ylabel: str | list = None,\
+            title: str = None,\
+            fig = None,\
+            axs = None,\
+            style=None,\
+            **kwargs):
+        
+        from matplotlib import pyplot as plt
+
+        ylim = [self.observed_dataframe.data.min(), self.observed_dataframe.data.max()]
+
+        data = self.get_feature(feature_name).T
+
+        num_dim = data.shape[1]
+
+        if scale == 'square':
+            data = np.square(data)
+
+        x = self.index.to_numpy()
+
+        data[:start,:] = np.nan
+
+        if fig is None or axs is None:
+            fig, axs = plt.subplots(num_dim, sharex=True, gridspec_kw={'hspace': HSPACE},figsize=[width,height*num_dim])
+            if style is None:
+                style = 'b-'
+            if num_dim == 1:
+                axs = [axs]
+
+        labels = self.observed_dataframe.dimensions
+        if ylabel is not None:
+            if isinstance(ylabel, str):
+                labels = np.array([ylabel]*num_dim)
+            else:
+                if len(ylabel) != num_dim:
+                    raise AttributeError("Number of terms in ylabel must be equal to the dimension size")
+                labels = ylabel
+
+        for k in range(num_dim):
+
+            Z = np.expand_dims(data[:, k], axis=0)
+
+            
+            axs[k].pcolormesh(x,ylim,Z[:,1:], cmap=colormap)
+            axs[k].grid(False)
+            axs[k].tick_params(left=False, labelleft=False)
+            axs[k].set_xlabel(xlabel)
+        axs[0].set_title(title)
+
+        return fig, axs
 
     @property
     def mean(self) -> np.ndarray:

@@ -12,7 +12,7 @@ class ArimaFit:
 
     from .series import DataFrame
 
-    def __init__(self,dataset: DataFrame, column: str | int = 0):
+    def __init__(self,dataset: DataFrame, column: str | int = 0): 
 
         if isinstance(column,str):
             self.column = np.where(dataset.dimensions == column)[0]
@@ -20,7 +20,7 @@ class ArimaFit:
             self.column = column
 
         self.dataset = dataset
-        self.test_size = 0
+        self.test_size = 1
         self.exog_vars = []
         self.AR = DEFAULT_AR
         self.I = DEFAULT_I
@@ -85,6 +85,25 @@ class ArimaFit:
             self.res = mod.fit(self.dataset.dataset[self.column],disp=0)
 
         return self.res
+    
+    def get_prediction(self):
+
+        # ind = self.dataset.index
+        # data_name = self.dataset.dimensions[self.column]
+        # y = self.dataset.dataset[self.column]
+
+        if len(self.exog_vars)>0:
+            exog = self.dataset.dataset[self.exog_vars].T
+        else:
+            exog = None
+
+        fitted_vals,_ = self.res.predict_in_sample(return_conf_int=True,X=exog)
+
+        return fitted_vals
+
+    def get_residual(self):
+        return self.res.resid()
+
 
     def plot_fit(self,plot_detailed=False):
 
