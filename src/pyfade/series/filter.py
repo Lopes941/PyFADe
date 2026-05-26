@@ -14,7 +14,22 @@ from abc import ABC, abstractmethod
 import scipy.signal
 
 class FilterType(Enum):
-    """ Filter selections """
+    """ 
+    Filter selections. See get_filter for their arguments.
+
+    Attributes
+    ----------
+    MA :
+        Moving average filter.
+    DIFF :
+        Finite difference filter.
+    BUTTER_LOW :
+        Low-pass butterworth filter.
+    BUTTER_HIGH :
+        High-pass butterworth filter.
+    BUTTER_PASS :
+        Band-pass butterworth filter.
+    """
      
     MA = 0, "Moving average filter"
     DIFF = 1, "Finite difference filter"
@@ -136,11 +151,10 @@ class ButterFilter(DataFilterInterface):
         elif method == FilterType.BUTTER_PASS:
             self.numerator_coeffs, self.denominator_coeffs = butter(order, cutoff_freq,fs=sampling_freq,btype='pass')
         
-
 def get_filter(FilterType: FilterType,
                *args,
                **kwargs) -> DataFilterInterface:
-    """ Returns the difference equation coefficients of a filter.
+    """ Return the difference equation coefficients of a filter.
 
         Returns the matrix profile of a time series. The matrix profile is defined by Prof. Eamon Keogh as the minimum distance profile for each subsequence in a time series. It is calculated here via the stumpy library.
 

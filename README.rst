@@ -49,14 +49,9 @@ License
 
 WIP
 
-.. _built-in wavelet filters: http://wavelets.pybytes.com/
-.. _Cython: http://cython.org/
-.. _demo: https://github.com/PyFADe/pywt/tree/main/demo
 .. _Anaconda: https://www.continuum.io
-.. _GitHub: https://github.com/PyFADe/pywt
-.. _GitHub Issues: https://github.com/PyFADe/pywt/issues
+% .. _GitHub: https://github.com/PyFADe/pywt
 .. _NumPy: https://www.numpy.org
 .. _SciPy: https://www.scipy.org
-.. _original developer: http://en.ig.ma
 .. _Python: http://python.org/
 .. _Matplotlib: http://matplotlib.org

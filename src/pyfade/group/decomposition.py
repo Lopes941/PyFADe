@@ -5,12 +5,11 @@ import pywt
 
 import matplotlib.pyplot as plt
 
-from ..core import IFeatureGroup
-from ..core import IFeatureGroupParameter
-from ..core import UseCudaParam, LeftOnlyParam, SkipStartParam, ExclusionZoneRatioParam, QuantileParam
+from pyfade.group import IFeatureGroup,  IFeatureGroupParameter
+from pyfade.group import UseCudaParam, LeftOnlyParam, SkipStartParam, ExclusionZoneRatioParam, QuantileParam
 
-from ..features import Features
-from ..series.series import DataFrame
+from pyfade.features import Features
+from pyfade.series import DataFrame
 
 HSPACE = 0.2
 class Decomposition:
@@ -238,6 +237,10 @@ class WaveletProfile(IFeatureGroup):
     @staticmethod
     def static_parameters():
         return [TotalWaveletLevel.static_name(),
+                AggregateWaveletLevel.static_name(),
+                WaveletType.static_name(),
+                WaveletAnalysisType.static_name(),
+                WaveletDenoiseThreshold.static_name(),
                 UseCudaParam.static_name(), 
                 LeftOnlyParam.static_name(), 
                 SkipStartParam.static_name(), 
@@ -309,7 +312,8 @@ class WaveletProfile(IFeatureGroup):
     def update(self, dataset, window_size: int):
 
         from ..series import DataFrameBuilder
-        from ..window import WindowBuilder, FeatureGroupBuilder
+        from ..window import WindowBuilder
+        from ..group import FeatureGroupBuilder, FeatureGroups
         
         self.decomposition: list = [None]*dataset.ndim
         mp_params = {

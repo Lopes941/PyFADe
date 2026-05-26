@@ -85,7 +85,7 @@ namespace cfade
              * @return const double The value at the specified row and column.
              */
             inline double at(int row, int col) const{
-                return IFeatureCRTP<KProfileValue>::at<typename value_type>(row,col);
+                return IFeatureCRTP<KProfileValue>::template at<value_type>(row,col);
             }
 
             /**
@@ -100,7 +100,7 @@ namespace cfade
              * @return double& A reference to the value at the specified row and column.
              */
             inline double& at(int row, int col){
-                return IFeatureCRTP<KProfileValue>::at<typename value_type>(row,col);
+                return IFeatureCRTP<KProfileValue>::template at<value_type>(row,col);
             }
 
     };
@@ -182,7 +182,7 @@ namespace cfade
              * @return const int The value at the specified row and column.
              */
             inline int at(int row, int col) const{
-                return IFeatureCRTP<KProfileIndex>::at<typename value_type>(row,col);
+                return IFeatureCRTP<KProfileIndex>::template at<value_type>(row,col);
             }
 
             /**
@@ -197,7 +197,7 @@ namespace cfade
              * @return int& A reference to the value at the specified row and column.
              */
             inline int& at(int row, int col){
-                return IFeatureCRTP<KProfileIndex>::at<typename value_type>(row,col);
+                return IFeatureCRTP<KProfileIndex>::template at<value_type>(row,col);
             }
 
     };

@@ -2,6 +2,7 @@
 #include <cfade/utils/utils.h>
 #include <cfade/dataset/dataset.h>
 
+#include <algorithm>
 #include <memory>
 #include <stdexcept>
 #include <iostream>
@@ -54,16 +55,14 @@ namespace cfade
     }
 
     double DataSet::get_data(int selected_dimension, int selected_timestamp)const{
-        try
-        {
+        try{
             check_selected_dimension(selected_dimension);
             check_selected_timestamp(selected_timestamp);
             return at(selected_dimension,selected_timestamp);
-        } 
-        catch(const std::exception& e)
-        {
+        }catch(const std::exception& e){
             std::cerr << e.what() << '\n';
         }
+        return 0;
     }
 
     const std::shared_ptr<VectorGroup<double>> DataSet::get_data(){

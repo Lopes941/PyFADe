@@ -3,7 +3,9 @@ from abc import ABC, abstractmethod
 import numpy as np
 from scipy.interpolate import interp1d
 
-class Interpolation:
+from enum import Enum
+
+class Interpolation(Enum):
     """
     Interpolation methods available for use in the InterpolatorInterface.
 
@@ -11,13 +13,13 @@ class Interpolation:
 
     Attributes
     ----------
-    LINEAR : int
+    LINEAR :
         Linear interpolation method identifier.
     """
 
-    LINEAR = 1
+    LINEAR = 1, "Linear"
 
-class Extrapolation:
+class Extrapolation(Enum):
     """
     Extrapolation methods available for use in the InterpolatorInterface.
 
@@ -25,11 +27,11 @@ class Extrapolation:
 
     Attributes
     ----------
-    CONSTANT : int
+    CONSTANT :
         Constant extrapolation method identifier.
     """
 
-    CONSTANT = 1
+    CONSTANT = 1, "Moving average filter"
 
 class InterpolatorInterface(ABC):
     """

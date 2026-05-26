@@ -1,9 +1,9 @@
 
 import numpy as np
 
-from ..core import IFeatureGroup, ContinuousStatistics
-from ..features import Features
-from ..series.series import DataFrame
+from pyfade.group import IFeatureGroup, ContinuousStatistics
+from pyfade.features import Features
+from pyfade.group import DataFrame
 
 
 class PythonStatistics(IFeatureGroup):

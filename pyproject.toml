@@ -1,9 +1,7 @@
 [build-system]
 requires = [
-  "scikit-build-core>=0.8.0",
-  "pybind11",
-  "setuptools",
-  "wheel"
+  "scikit-build-core>=0.10",
+  "pybind11>=2.12"
 ]
 build-backend = "scikit_build_core.build"
 
@@ -13,7 +11,32 @@ version = "0.1.0"
 description = "Matrix profile calculation module"
 authors = [{ name = "Heitor Lopes", email = "hnlopes@unicamp.br" }]
 requires-python = ">=3.8"
+license-files = ["LICEN[CS]E*"]
+
+dependencies = [
+    "numpy",
+    "scipy",
+    "matplotlib",
+    "pandas",
+    "pmdarima",
+    "PyWavelets"
+]
+
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Programming Language :: C++",
+    "Operating System :: OS Independent",
+    "License :: OSI Approved :: GNU General Public License v3 (GPLv3)"
+]
 
 [tool.scikit-build]
 wheel.packages = ["src/pyfade"]
+sdist.include = ["pyfade/**"]
 
+[tool.setuptools.package-data]
+pyfade = ["*.pyi", "stubs/pyfade/*.pyi","*.dll"]
+
+[tool.scikit-build.cmake]
+args = []
+build-type = "Release"
+verbose = false

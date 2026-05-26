@@ -11,7 +11,38 @@ set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 find_package(Python COMPONENTS Interpreter Development REQUIRED)
 find_package(pybind11 CONFIG REQUIRED)
 
-# Trying to find CUDA
+# ================================
+# PYFADE SOURCE FILES
+# ================================
+
+file(GLOB BINDING_SOURCES src/pyfade/bindings.cpp)
+file(GLOB CPU_SOURCES src/pyfade/cpp/cpu_funcs.cpp)
+file(GLOB UTILS_SOURCES src/pyfade/cpp/utils.cpp)
+file(GLOB DATASET_SOURCES src/pyfade/cpp/dataset.cpp)
+file(GLOB FEATURES_SOURCES src/pyfade/cpp/features.cpp)
+file(GLOB STATISTICS_SOURCES src/pyfade/cpp/statistics.cpp)
+file(GLOB MAT_PROFILE_SOURCES src/pyfade/cpp/matrix_profile.cpp)
+file(GLOB K_PROFILE_SOURCES src/pyfade/cpp/k_profile.cpp)
+
+file(GLOB CUDA_SOURCES src/pyfade/cpp/cuda_funcs.cu)
+
+
+set(SOURCE_FILES
+    ${BINDING_SOURCES}
+    ${CPU_SOURCES}
+    ${UTILS_SOURCES}
+    ${DATASET_SOURCES}
+    ${FEATURES_SOURCES}
+    ${STATISTICS_SOURCES}
+    ${MAT_PROFILE_SOURCES}
+    ${K_PROFILE_SOURCES}
+    )
+
+
+# ================================
+# CUDA DETECTION
+# ================================
+
 find_package(CUDAToolkit QUIET)
 
 if (DEFINED CUDAToolkit_ROOT)
@@ -39,6 +70,14 @@ else()
     set(HAS_CUDA FALSE)
 endif()
 
+if (HAS_CUDA)
+    list(APPEND SOURCE_FILES ${CUDA_SOURCES})
+endif()
+
+# ================================
+# CONFIG GENERATION 
+# ================================
+
 # Write the path to a Python file inside the package
 file(WRITE "${CMAKE_CURRENT_BINARY_DIR}/cuda_config.py"
      "cuda_path = r'${RESOLVED_CUDA_PATH}'\n")
@@ -49,26 +88,27 @@ install(FILES "${CMAKE_CURRENT_BINARY_DIR}/cuda_config.py"
         DESTINATION pyfade)
 
 
-set(SOURCE_FILES
-    src/pyfade/bindings.cpp
-    src/pyfade/cpp/cpu_funcs.cpp
-    src/pyfade/cpp/utils.cpp
-    src/pyfade/cpp/dataset.cpp
-    src/pyfade/cpp/features.cpp
-    src/pyfade/cpp/statistics.cpp
-    src/pyfade/cpp/matrix_profile.cpp
-    src/pyfade/cpp/k_profile.cpp
-    )
-
-if (HAS_CUDA)
-    list(APPEND SOURCE_FILES src/pyfade/cpp/cuda_funcs.cu)
-endif()
+# =================================
+# Install Python extension + stubs
+# =================================
 
 pybind11_add_module(core ${SOURCE_FILES})
 
-if (HAS_CUDA)
-    target_link_libraries(core PRIVATE CUDA::cufft CUDA::cudart)
+target_include_directories(core PRIVATE
+    ${PROJECT_SOURCE_DIR}/include
+)
+
+# macOS specific
+if(APPLE)
+    set_target_properties(core PROPERTIES LINK_FLAGS "-undefined dynamic_lookup")
 endif()
 
-target_include_directories(core PRIVATE ${PROJECT_SOURCE_DIR}/include)
-install(TARGETS core LIBRARY DESTINATION pyfade)
+if (HAS_CUDA)
+    target_link_libraries(core PRIVATE CUDA::cufft CUDA::cudart)
+    set_target_properties(core PROPERTIES CUDA_SEPARABLE_COMPILATION ON)
+endif()
+
+
+install(TARGETS core 
+    LIBRARY DESTINATION pyfade
+    )

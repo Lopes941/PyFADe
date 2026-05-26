@@ -1,5 +1,5 @@
 
-from ..core import IFeature
+from pyfade.features import IFeature
 
 class Meanpy(IFeature):
 
@@ -24,5 +24,5 @@ class Stdpy(IFeature):
         super().__init__()
     
     def name(self):
-        return Meanpy.static_name()
+        return Stdpy.static_name()
 

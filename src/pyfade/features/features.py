@@ -2,8 +2,9 @@
 from enum import Enum
 from .pystatistics import Meanpy, Stdpy
 from .decomposition import WaveletMP, WaveletKP
-from ..core import ContinuousStatistics, MatrixProfile, KProfile
 
+
+from ..core import IFeature, ContinuousStatistics, MatrixProfile, KProfile
 
 class Features(Enum):
     Mean = ContinuousStatistics.static_feature_names()[0]

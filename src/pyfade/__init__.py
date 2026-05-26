@@ -11,7 +11,20 @@ except Exception as e:
 
 # from .decomposition import get_signal_decomp
 from .utility import clean_database, load_data, get_args, get_sub_sequence, get_well_data, get_shutdowns
-from .series import *
-from .group import *
-from .features import *
-from .window import *
+
+from . import utility
+from . import series
+from . import group
+from . import features
+from . import window
+
+_all = [name for name in dir() if not name.startswith("_") and not name=='core']
+
+__all__ = _all
+__all__.extend(series.__all__)
+__all__.extend(window.__all__)
+__all__.extend(features.__all__)
+__all__.extend(group.__all__)
+# __all__.extend(analysis.__all__)
+# __all__.extend(results.__all__)
+# __all__.extend(solver.__all__)

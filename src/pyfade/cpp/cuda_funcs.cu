@@ -399,7 +399,7 @@ void cuda_convolve(double* d_QT,
 
     // Inverse FFT
     int blocks_normalization;
-    choose_cuda_parameters(fft_size,blocks_normalization,threads);
+    choose_cuda_parameters(padded_size,blocks_normalization,threads);
     cufftHandle plan_ifft;
     cufftPlan1d(&plan_ifft, padded_size, CUFFT_Z2D, 1);
     cufftExecZ2D(plan_ifft, d_fft_series, d_QT_padded);
@@ -415,6 +415,7 @@ void cuda_convolve(double* d_QT,
     cudaFree(d_fft_series);
     cudaFree(d_fft_Q);
     cudaFree(d_QT_padded);
+    cudaFree(d_Q);
 
 }
 

@@ -82,7 +82,7 @@ namespace cfade
              * @return const double& The value at the specified position.
              */
             inline double at(int row, int col) const{
-                return IFeatureCRTP<ContinuousMean>::at<typename value_type>(row,col);
+                return IFeatureCRTP<ContinuousMean>::template at<value_type>(row,col);
             }
 
             /**
@@ -96,7 +96,7 @@ namespace cfade
              * @return double& A reference to the value at the specified position.
              */
             inline double& at(int row, int col){
-                return IFeatureCRTP<ContinuousMean>::at<typename value_type>(row,col);
+                return IFeatureCRTP<ContinuousMean>::template at<value_type>(row,col);
             }
 
     };
@@ -179,7 +179,7 @@ namespace cfade
              * @return const double& The value at the specified position.
              */
             inline double at(int row, int col) const{
-                return IFeatureCRTP<ContinuousStandardDeviation>::at<typename value_type>(row,col);
+                return IFeatureCRTP<ContinuousStandardDeviation>::template at<value_type>(row,col);
             }
 
 
@@ -194,7 +194,7 @@ namespace cfade
              * @return double& A reference to the value at the specified position.
              */
             inline double& at(int row, int col){
-                return IFeatureCRTP<ContinuousStandardDeviation>::at<typename value_type>(row,col);
+                return IFeatureCRTP<ContinuousStandardDeviation>::template at<value_type>(row,col);
             }
 
     };

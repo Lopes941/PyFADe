@@ -21,35 +21,6 @@ class DataFrame:
     It is designed to be used in conjunction with the DataFrameBuilder class, which
     simplifies the creation of DataFrame objects by allowing method chaining to set
     various properties.
-
-    Attributes
-    ----------
-    dataset: DataSet
-        Object that holds the multi-dimensional time series.
-    interpolator: InterpolatorInterface
-        Object that holds the interpolation and extrapolation methods.
-    filter: DataFilterInterface
-        Object that holds the filter methods.
-    dimensions: np.ndarray
-        Array that holds the name of each dimension.
-
-    Properties
-    ----------
-    data: np.ndarray
-        Multi-dimensional time series held by dataset.
-    index: np.ndarray
-        Index from the multi-dimensional time series held by dataset.
-
-    See Also
-    --------
-    DataFrameBuilder: Builder class for creating a DataFrame object.
-    pyDataSet: Abstract class that holds a dataset.
-    NumpyDataSet: Class that holds a dataset in the form of a numpy array.
-    PandasDataSet: Class that holds a dataset in the form of a pandas DataFrame.
-    InterpolatorInterface: Interface for interpolators that implement interpolation and extrapolation methods.
-    Interpolation: Enum for interpolation methods.
-    Extrapolation: Enum for extrapolation methods.
-
     """
 
     interpolator = None
@@ -59,8 +30,9 @@ class DataFrame:
     
     def __init__(self):
         """
-        Initializes the DataFrame object.
+        Create the DataFrame object. Use DataFrameBuilder instead of creating a DataFrame directly.
         """
+
         self.dataset = None
         self.interpolator = None
         self.cleaner = None
@@ -81,7 +53,7 @@ class DataFrame:
     @data.setter
     def data(self,new_data:np.ndarray):
         """
-        Sets the multi-dimensional time series value.
+        Set the multi-dimensional time series value.
 
         Only call this append new data.
 
@@ -119,14 +91,14 @@ class DataFrame:
     @property
     def index(self) -> np.ndarray:
         """
-        np.ndarray : Timestep index from time-series.
+        np.ndarray : Timestamp index from time-series.
         """
-        return self.dataset.index
 
+        return self.dataset.index
 
     def as_pandas(self) -> pandas.DataFrame:
         """
-        Returns the data and the index from the dataset as a pandas DataFrame.
+        Return the data and the index from the dataset as a pandas DataFrame.
 
         This method can be called to return de dataset as a pandas DataFrame object.
         
@@ -137,10 +109,9 @@ class DataFrame:
         """
         return pandas.DataFrame(self.data.T,index=self.dataset.index)
 
-
     def _build_initial_data(self):
         """
-        Builds the initial dataset by running the interpolator in the dataset.
+        Build the initial dataset by running the interpolator in the dataset.
 
         This method is called after the DataFrameBuilder has set the initial data.
 
@@ -193,6 +164,44 @@ class DataFrame:
             axs = None,\
             style=None,\
             **kwargs):
+        """
+        Plot the series.
+
+        Parameters
+        -----------
+        height: float, optional (default=3)
+            Height of the window.
+        width: float, optional (default=10)
+            Width of the window.
+        xlimits: list, optional (default=None)
+            Limits of the x-axis.
+        ylimits: list, optional (default=None)
+            Limits of the y-axis.
+        xlabel: str, optional (default='Timestamp')
+            Label on the x axis.
+        ylabel: str|list, optional (default=None)
+            Label on the y axes. If string, a number is added automatically after, to indicate each plot.
+        title: str, optional (default=None)
+            Title of the figure object.
+        fig: matplotlib.Figure object, optional (default=None)
+            Figure object if desired to reutilize a figure.
+        axs: list[matplotlib.Axes object], optional (default=None)
+            Axes objects if desired to reutilize an axes object.
+        style: str, optional(default=None)
+            Style for the lines and markers, use matplotlib notation and defaults.
+
+        Returns
+        --------
+        fig: matplotlib.Figure object
+            Figure object.
+        axs: list[matplotlib.Axes object]
+            List of axes objects.
+            
+        Raises
+        -------
+        RuntimeError: If the dataset is not set before calling this method.
+        ValueError: If the dataset is not of type NumpyDataSet or PandasDataSet.
+        """
         
         return plot_data(self.data,\
                         self.index,\
@@ -211,7 +220,7 @@ class DataFrame:
 
     def insert_data(self, inserted_data: np.ndarray | pandas.DataFrame | pandas.Series):
         """
-        Inserts new data in the timeseries. Already runs the interpolators.
+        Insert new data in the timeseries. Already runs the interpolators.
 
         Parameters
         ----------
@@ -260,45 +269,25 @@ class DataFrameBuilder:
     and extrapolation methods. It simplifies the creation of DataFrame objects
     by providing a fluent interface.
 
-    Args
-    ----
-    data (np.ndarray | pandas.DataFrame): The data to be used in the DataFrame. 
-
-    Attributes
+    Parameters
     ----------
-    _dataframe : DataFrame
-        The DataFrame object being built.
-
-    Methods
-    ------- 
-    build() -> DataFrame:
-        Builds the DataFrame object and returns it.
-    set_interpolation(interpolation: Interpolation) -> Self:
-        Sets the interpolation method for the DataFrame.
-    set_extrapolation(extrapolation: Extrapolation) -> Self:
-        Sets the extrapolation method for the DataFrame.
-    set_filter(filter_tyoe: FilterType) -> Self:
-        Sets the filtering technique for the DataFrame.
-
-    See Also
-    --------
-    DataFrame: The DataFrame object that is being built.
-    DataSet: Base class for datasets that holds the data and index.
-    InterpolatorInterface: Interface for interpolators that implement interpolation and extrapolation methods.
-    Interpolation: Enum for interpolation methods.
-    Extrapolation: Enum for extrapolation methods.
+    data : np.ndarray | pandas.DataFrame | pandas.Series
+        The data to be used in the DataFrame. It can be a 1D or 2D numpy array,
+        a pandas DataFrame, or a pandas Series. The data will be used to initialize
+        the DataFrame object. If a pandas Series is provided, it will be converted 
+        to a 2D array.
+    wavelet_decomposition_level: int (optional, default=0)
+        Level of the wavelet decomposition used on the dataset.
 
     Example
     -------
     >>> import numpy as np
     >>> import pandas as pd
-    >>> from pyfade import DataFrameBuilder, Interpolation, Extrapolation
+    >>> from pyfade.series import DataFrameBuilder, Interpolation, Extrapolation
 
     >>> data = np.array([[1, 2, np.nan], [4, np.nan, 6]])
     >>> builder = DataFrameBuilder(data)
-    >>> dataframe = builder.set_interpolation(Interpolation.LINEAR) \
-                            .set_extrapolation(Extrapolation.CONSTANT) \
-                            .build()
+    >>> dataframe = builder.set_interpolation(Interpolation.LINEAR).set_extrapolation(Extrapolation.CONSTANT).build()
     >>> print(dataframe.data)
     [[ 1.  2.  2.]
     [ 4.  5.  6.]]
@@ -311,23 +300,11 @@ class DataFrameBuilder:
 
     def __init__(self, data : np.ndarray | pandas.DataFrame | pandas.Series, wavelet_decomposition_level: int = 0):
         """
-        Initializes the DataFrameBuilder object with given data.
+        Initialize the DataFrameBuilder object with given data.
 
         Creates a DataFrame object with given dataset, choosing the appropriate
         derived DataFrame object based on the given data type.
 
-        Parameters
-        ----------
-        data : np.ndarray | pandas.DataFrame | pandas.Series
-            The data to be used in the DataFrame. It can be a 1D or 2D numpy array,
-            a pandas DataFrame, or a pandas Series. The data will be used to initialize
-            the DataFrame object. If a pandas Series is provided, it will be converted 
-            to a 2D array.
-
-        Raises
-        -------
-        RuntimeError: If the data type is not supported.
-        ValueError: If the data is not a 1D or 2D array.
         """
 
         if wavelet_decomposition_level == 0:
@@ -369,11 +346,10 @@ class DataFrameBuilder:
             if isinstance(data,pandas.DataFrame):
                 self._dataframe.dataset.data = data.values.T
                 
-                
-        
+                     
     def build(self) -> DataFrame:
         """
-        Builds the DataFrame object and returns it.
+        Build the DataFrame object and returns it.
 
         This method initializes the DataFrame with the data provided to the DataFrameBuilder
         and runs the interpolation and extrapolation methods on the initial data.
@@ -381,7 +357,8 @@ class DataFrameBuilder:
         
         Returns
         -------
-        DataFrame: The built DataFrame object with the dataset and interpolator set.
+        data: DataFrame
+            The built DataFrame object with the dataset and interpolator set.
 
         Raises
         -------
@@ -396,7 +373,7 @@ class DataFrameBuilder:
 
     def set_interpolation(self,interpolation: Interpolation) -> Self:
         """
-        Sets the interpolation method for the DataFrame.
+        Set the interpolation method for the DataFrame.
 
         The interpolation method set here will be used to generate artificial data to ocupy NaN
         entries in the dataset. The method will generate values only for NaNs between valid entries.
@@ -417,7 +394,7 @@ class DataFrameBuilder:
 
     def set_extrapolation(self,extrapolation: Extrapolation) -> Self:
         """
-        Sets the extrapolation method for the DataFrame.
+        Set the extrapolation method for the DataFrame.
 
         The extrapolation method set here will be used to generate artificial data to ocupy NaN
         entries in the dataset. The method will generate values only for leading or trailing NaNs.
@@ -438,7 +415,14 @@ class DataFrameBuilder:
     
     def set_filter(self, filter_type: FilterType, *args, **kwargs):
         """
-        TODO: Write.
+        Set the filter method for the DataFrame.
+
+        The required inputs vary based on the filtering technique. See the method get_filter for more information.
+
+        Parameters
+        ----------
+        filter_type : FilterType
+            Type of filter to be used.
         """
         self._dataframe.filter = get_filter(filter_type, *args, **kwargs)
         return self

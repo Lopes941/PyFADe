@@ -531,7 +531,7 @@ namespace cfade{
              * 
              * @param observed_dataset The dataset to use for the QT data.
              * @param means The means of the dataset.
-             * @param stds The standard deviations of the dataset.
+             * @param stds The standard deviations of the dataset. 
              * @param window_size The size of the window to use for the QT data.
              */
             QTDataCPU(const std::shared_ptr<DataSet> observed_dataset,
@@ -549,6 +549,7 @@ namespace cfade{
     };
 
 
+    #ifdef USE_CUDA
     /**
      * @brief Implementation of QT data for CUDA.
      * 
@@ -588,6 +589,7 @@ namespace cfade{
              */
             ~QTDataCUDA();
     };
+    #endif
    
 
 

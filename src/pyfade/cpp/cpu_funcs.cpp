@@ -2,30 +2,267 @@
 #include <vector>
 #include <thread>
 #include <cmath>
+#include <memory>
+#include <algorithm>
+
+#include <cfade/utils/utils.h>
+#include <cfade/dataset/dataset.h>
 
 using ComplexArray = std::vector<double>;
 
-int get_next_power_of_two(int n){
-    if (n <=0) return 1;
+void increment_QT(const std::vector<double>& series,
+                    std::vector<double>& QT,
+                    const std::vector<double>& QT_old, 
+                    const std::vector<double>& QT_first,
+                    const int i,
+                    const int final_size,
+                    const int interval_size){
+    
+    for (int idx = 0; idx < final_size; ++idx) {
+        if (idx == 0) {
+            QT[idx] = QT_first[i];
+        } else {
+            QT[idx] = QT_old[idx - 1] 
+                      - series[idx - 1] * series[i - 1] 
+                      + series[idx + interval_size - 1] * series[i + interval_size - 1];
+        }
+    }
+    
+}
+
+void distance_profile(const std::vector<double>& series, 
+                        const std::vector<double>& QT,
+                        const std::vector<double>& means, 
+                        const std::vector<double>& stds, 
+                        double* D, 
+                        int* I, 
+                        const int i, 
+                        const int final_size, 
+                        const int interval_size,
+                        const int exclusion_zone_size,
+                        const bool left_only){
+    
+    double den, Dj;
+    for (int idx = 0; idx < final_size; ++idx) {
+
+        if (abs(idx - i) >= exclusion_zone_size && (!left_only || idx<i)){
+
+            den = interval_size*stds[i]*stds[idx];
+            if (fabs(den) > 1e-9){
+
+                double val_inside = 1.0 - (QT[idx] - interval_size * means[i] * means[idx]) / den;
+                
+                // Correção para imprecisões numéricas de ponto flutuante
+                if (val_inside < 0.0) val_inside = 0.0;
+
+                Dj = sqrt(2 * interval_size * val_inside);
+
+                if (!std::isnan(Dj)) {
+                    if (*D == -1.0 || Dj < *D) {
+                        *D = Dj;
+                        *I = idx;
+                    }
+                }
+            }
+        }
+    }
+
+}
+
+void stomp_iteration(const std::vector<double>& series, 
+                                std::vector<double>& QT,
+                                const std::vector<double>& QT_old, 
+                                const std::vector<double>& means, 
+                                const std::vector<double>& stds, 
+                                double* D, 
+                                int* I, 
+                                const std::vector<double>& QT_first, 
+                                const int i, 
+                                const int final_size, 
+                                const int interval_size,
+                                const int exclusion_zone_size,
+                                const bool left_only){
+    
+    double den, Dj;
+    for (int idx = 0; idx < final_size; ++idx) {
+
+        increment_QT(series,QT,QT_old,QT_first,i,final_size,interval_size);
+
+        if (abs(idx - i) >= exclusion_zone_size && (!left_only || idx<i)){
+
+            den = interval_size*stds[i]*stds[idx];
+            if (fabs(den) > 1e-9){
+
+                double val_inside = 1.0 - (QT[idx] - interval_size * means[i] * means[idx]) / den;
+                
+                // Correção para imprecisões numéricas de ponto flutuante
+                if (val_inside < 0.0) val_inside = 0.0;
+
+                Dj = sqrt(2 * interval_size * val_inside);
+
+                if (!std::isnan(Dj)) {
+                    if (*D == -1.0 || Dj < *D) {
+                        *D = Dj;
+                        *I = idx;
+                    }
+                }
+            }
+
+
+        }
+    }
+
+}
+
+
+// Launching STOMP
+void cpu_STOMP_iterations(const std::shared_ptr<cfade::DataSet> observed_dataset,
+                        const std::shared_ptr<cfade::VectorGroup<double>> means,
+                        const std::shared_ptr<cfade::VectorGroup<double>> stds,
+                        double* QT,
+                        std::shared_ptr<cfade::VectorGroup<double>> MP, 
+                        std::shared_ptr<cfade::VectorGroup<int>> inds_MP,
+                        int start_location, 
+                        const int final_size, 
+                        const int interval_size,
+                        const int exclusion_zone_size,
+                        const bool left_only){
+
+    int number_of_updates = final_size-start_location;
+
+    std::vector<double> D(number_of_updates, -1.0);
+    std::vector<int> I(number_of_updates, -1);
+    
+    std::vector<double> QT_first(final_size);
+    std::vector<double> QT_even(final_size);
+    std::vector<double> QT_odd(final_size);
+
+    
+    for(int dimension = 0; dimension<observed_dataset->get_dimension();dimension++){
+
+        std::vector<double> series_vec = (*(observed_dataset->get_data()))[dimension];
+        std::vector<double> mean_vec = (*means)[dimension];
+        std::vector<double> std_vec = (*stds)[dimension];
+
+
+        std::fill(D.begin(),D.end(),-1.0);
+        std::fill(I.begin(),I.end(),-1);
+
+        int current_update = 0;
+        bool use_odd = true;
+
+        const double* QT_start = QT + dimension*final_size;
+
+        std::copy(QT_start, QT_start + final_size, QT_first.begin());
+        std::copy(QT_start, QT_start + final_size, QT_odd.begin());
+
+        for(int i=0; i<start_location+1; i++){
+            if(use_odd){
+                increment_QT(series_vec,QT_even,QT_odd,QT_first,i,final_size,interval_size);
+                use_odd = false;
+            }else{
+                increment_QT(series_vec,QT_odd,QT_even,QT_first,i,final_size,interval_size);
+                use_odd = true;
+            }
+
+        }
+        
+        if(use_odd){
+            distance_profile(series_vec,
+                                QT_odd,
+                                mean_vec,
+                                std_vec,
+                                &D[current_update],
+                                &I[current_update],
+                                start_location+current_update,
+                                final_size,
+                                interval_size,
+                                exclusion_zone_size,
+                                left_only);
+        }else{
+            distance_profile(series_vec,
+                                QT_even,
+                                mean_vec,
+                                std_vec,
+                                &D[current_update],
+                                &I[current_update],
+                                start_location+current_update,
+                                final_size,
+                                interval_size,
+                                exclusion_zone_size,
+                                left_only);
+        }
+        current_update++;
+
+        for(; current_update<number_of_updates;current_update++){
+            if (use_odd){
+                stomp_iteration(series_vec,
+                                QT_even,
+                                QT_odd,
+                                mean_vec,
+                                std_vec,
+                                &D[current_update],
+                                &I[current_update],
+                                QT_first,
+                                start_location+current_update,
+                                final_size,
+                                interval_size,
+                                exclusion_zone_size,
+                                left_only);
+                use_odd = false;
+            }else{
+                stomp_iteration(series_vec,
+                                QT_odd,
+                                QT_even,
+                                mean_vec,
+                                std_vec,
+                                &D[current_update],
+                                &I[current_update],
+                                QT_first,
+                                start_location+current_update,
+                                final_size,
+                                interval_size,
+                                exclusion_zone_size,
+                                left_only);
+                use_odd = true;
+            }
+        }
+
+        for(int j=0;j<number_of_updates;j++){
+            MP->at(dimension,j+start_location) = D[j];
+            inds_MP->at(dimension,j+start_location) = I[j];
+        }
+    }
+
+}
+
+
+
+// ==========================
+//  START FUNCTIONS
+// ==========================
+
+
+size_t get_next_power_of_two(size_t n){
+
+    if (n <=1) return 1;
     
     n--;
-    n |= n >> 1;
-    n |= n >> 2;
-    n |= n >> 4;
-    n |= n >> 8;
-    n |= n >> 16;
+    for (size_t i = 1; i < sizeof(size_t)*8; i <<= 1)
+        n |= n >> i;
+
     return n + 1;
 }
 
 // Bit-reversal algorithm for complex array
 void bit_reversal2(double *data, 
-                int size){
+                size_t size){
     
-    int size2 = 2*size;
+    size_t size2 = 2*size;
 
-    int j=0;
-    int m;
-    for (int i=0; i<size2; i+=2){
+    size_t j=0;
+    size_t m;
+    for (size_t i=0; i<size2; i+=2){
         if(j>i){
             std::swap(data[j],data[i]);
             std::swap(data[j+1],data[i+1]);
@@ -42,31 +279,41 @@ void bit_reversal2(double *data,
 
 // Danielson-Lanczos for FFT
 void inplace_danielson_lanczos_Z2Z(double *data,
-                                   int size,
+                                   size_t size,
                                    int isign) {
-    int size2 = 2 * size;
-    int mmax = 2;
+    size_t size2 = 2 * size;
+    size_t mmax = 2;
     constexpr double PI2 = 6.28318530717958647692;
 
     while (mmax < size2) {
-        int istep = mmax << 1;
-        double theta = isign * ( PI2 / mmax);  // 2π/mmax
+        size_t istep = mmax << 1;
+        double theta = -isign * ( PI2 / mmax);  // 2π/mmax
 
-        for (int m = 0; m < mmax; m += 2) {
-            double angle = (m / 2) * theta;
-            double wr = std::cos(angle);
-            double wi = std::sin(angle);
+        double wtemp = std::sin(0.5 * theta);
+        double wpr = -2.0 * wtemp * wtemp;
+        double wpi = std::sin(theta);
 
-            for (int i = m; i < size2; i += istep) {
-                int j = i + mmax;
+        double wr = 1.0;
+        double wi = 0.0;
+
+        for (size_t m = 0; m < mmax; m += 2) {
+            for (size_t i = m; i < size2; i += istep) {
+
+                size_t j = i + mmax;
                 double tempr = wr * data[j] - wi * data[j + 1];
                 double tempi = wr * data[j + 1] + wi * data[j];
 
                 data[j]     = data[i] - tempr;
                 data[j + 1] = data[i + 1] - tempi;
+
                 data[i]    += tempr;
                 data[i + 1]+= tempi;
+
             }
+
+            double wr_old = wr;
+            wr = wr * wpr - wi * wpi + wr;
+            wi = wi * wpr + wr_old * wpi + wi;
         }
 
         mmax = istep;
@@ -91,114 +338,6 @@ void inplace_fft_Z2Z(ComplexArray& data,
 }
 
 
-void realft(std::vector<double>& data, 
-            size_t size,
-            int isign=1){
-
-    int i, i1, i2, i3, i4;
-    int n = data.size();
-
-    double c1=0.5;
-    double c2, h1r, h1i, h2r, h2i, wr, wi, wpr, wpi, wtemp;
-    double theta = 3.141592653589793238 / static_cast<double>(n>>1);
-
-    if (isign == 1) {
-        c2 = -0.5;
-        inplace_fft_Z2Z(data, size, isign);
-    } else {
-        c2 = 0.5;
-        theta = -theta;
-    }
-
-    wtemp = std::sin(0.5 * theta);
-    wpr = -2.0 * wtemp * wtemp;
-    wpi = std::sin(theta);
-    wr = 1.0 + wpr;
-    wi = wpi;
-
-    for (int k = 1; k < size / 2; ++k) {
-        int i1 = 2 * k;
-        int i2 = 2 * (size - k);
-
-        h1r = c1 * (data[i1] + data[i2]);
-        h1i = c1 * (data[i1 + 1] - data[i2 + 1]);
-        h2r = -c2 * (data[i1 + 1] + data[i2 + 1]);
-        h2i = c2 * (data[i1] - data[i2]);
-
-        data[i1]     = h1r + wr * h2r - wi * h2i;
-        data[i1 + 1] = h1i + wr * h2i + wi * h2r;
-        data[i2]     = h1r - wr * h2r + wi * h2i;
-        data[i2 + 1] = -h1i + wr * h2i + wi * h2r;
-
-        double wtemp_copy = wr;
-        wr = wtemp_copy * wpr - wi * wpi + wr;
-        wi = wi * wpr + wtemp_copy * wpi + wi;
-    }
-
-    if (isign == 1) {
-        double tmp = data[0];
-        data[0] = tmp + data[1];
-        data[1] = tmp - data[1];
-    } else {
-        double tmp = data[0];
-        data[0] = 0.5 * (tmp + data[1]);
-        data[1] = 0.5 * (tmp - data[1]);
-    }
-
-}
-
-
-// Inplace fft (based on numerical recipes)
-void inplace_mult_fft(ComplexArray& data, size_t size) {
-    int size2 = 2 * size;
-    int j = size2 - 2;
-
-    double Ref, Imf, Reg, Img;
-    double real, imag;
-
-    for (int i = 0; i < size2; i += 2) {
-        if (j < i) break;
-
-        // Unpack F and G from real/imag
-        Ref = 0.5 * (data[i] + data[j]);
-        Imf = 0.5 * (data[i+1] - data[j+1]);
-
-        Reg = 0.5 * (data[i+1] + data[j+1]);
-        Img = 0.5 * (data[i] - data[j]);
-
-        // Multiply (F)(G)
-        real = Ref * Reg - Imf * Img;
-        imag = Ref * Img + Imf * Reg;
-
-        data[i]   = real;
-        data[i+1] = imag;
-
-        if (i>0){
-            data[j]   = real;
-            data[j+1] = -imag;
-            j -= 2;
-        }
-    }
-
-}
-
-void print_arr(ComplexArray& arr, size_t N){
-    for (int k = 0; k <= N/2; ++k) {
-        double re, im;
-        if (k == 0) {
-            re = arr[0];
-            im = 0.0;
-        } else if (k == N/2) {
-            re = arr[1];
-            im = 0.0;
-        } else {
-            re = arr[2*k];
-            im = arr[2*k+1];
-        }
-        std::cerr << re << " + " << im << " i, ";
-    }
-}
-
 void cpu_convolve(double *QT,
                 const double* series_padded, 
                 const double* Q_padded, 
@@ -208,7 +347,6 @@ void cpu_convolve(double *QT,
 
     // Writing complex vector
     size_t N = get_next_power_of_two(padded_size);
-    std::cerr << N << " , " << padded_size << std::endl;
 
     ComplexArray p_series(2*N,0.0);
     ComplexArray p_query(2*N,0.0);
@@ -219,42 +357,35 @@ void cpu_convolve(double *QT,
         p_query[2*i] = Q_padded[i];
     }
     
-    
-
-
     // FFT
-    // inplace_fft_Z2Z(p_series,N,1);
-    realft(p_series,N,1);
-    std::cerr << "Series:" << std::endl;
-    // print_arr(p_series,padded_size);
-    for(int i=1; i<2*N; i+=2){
-        std::cerr << p_series[i-1] << " + " << p_series[i] << " i, ";
-    }
-    std::cerr << std::endl;
-
-    // inplace_fft_Z2Z(p_query,N,1);
-    realft(p_query,N,1);
-    std::cerr << "Query:" << std::endl;
-    for(int i=1; i<2*N; i+=2){
-        std::cerr << p_query[i-1] << " + " << p_query[i] << " i, ";
-    }
-    std::cerr << std::endl;
+    inplace_fft_Z2Z(p_series,N,1);
+    inplace_fft_Z2Z(p_query,N,1);
 
     // Multiply FFTs
-    inplace_mult_fft(two_inpts,N);
+    for (size_t i=0; i<2*N; i+=2) {
 
-    std::cerr << "Mult:" << std::endl;
-    for(int i=1; i<2*N; i+=2){
-        std::cerr << two_inpts[i-1] << " + " << two_inpts[i] << " i, ";
+        double ar = p_series[i];
+        double ai = p_series[i+1];
+
+        double br = p_query[i];
+        double bi = p_query[i+1];
+
+        two_inpts[i]   = ar*br - ai*bi;
+        two_inpts[i+1] = ar*bi + ai*br;
     }
-    std::cerr << std::endl;
 
     // IFFT
-    // inplace_fft_Z2Z(two_inpts,N,-1);
+    inplace_fft_Z2Z(two_inpts,N,-1);
+
+    double scale = 1.0 / N;
+    for (size_t i = 0; i < 2*N; ++i) {
+        two_inpts[i] *= scale;
+    }
 
     // Geeting real part of multiplication
-    for(int i=0; i<mp_size;i++){
-        QT[i] = two_inpts[2*(i+interval_size-1)]/N;
+    int offset = interval_size - 1;
+    for(int i=0; i<mp_size; i++){
+        QT[i] = two_inpts[2*(i  + offset)];
     }
 
 }

@@ -84,7 +84,7 @@ namespace cfade{
              * @return const double The value at the specified row and column.
              */
             inline double at(int row, int col) const{
-                return IFeatureCRTP<MatrixProfileValue>::at<typename value_type>(row,col);
+                return IFeatureCRTP<MatrixProfileValue>::template at<value_type>(row,col);
             }
 
             /**
@@ -99,7 +99,7 @@ namespace cfade{
              * @return double& A reference to the value at the specified row and column.
              */
             inline double& at(int row, int col){
-                return IFeatureCRTP<MatrixProfileValue>::at<typename value_type>(row,col);
+                return IFeatureCRTP<MatrixProfileValue>::template at<value_type>(row,col);
             }
 
     };
@@ -187,7 +187,7 @@ namespace cfade{
              * @return const int& The value at the specified position.
              */
             inline int at(int row, int col) const{
-                return IFeatureCRTP<MatrixProfileIndex>::at<typename value_type>(row,col);
+                return IFeatureCRTP<MatrixProfileIndex>::template at<value_type>(row,col);
             }
 
             /**
@@ -201,7 +201,7 @@ namespace cfade{
              * @return int& A reference to the value at the specified position.
              */
             inline int& at(int row, int col){
-                return IFeatureCRTP<MatrixProfileIndex>::at<typename value_type>(row,col);
+                return IFeatureCRTP<MatrixProfileIndex>::template at<value_type>(row,col);
             }
 
     };

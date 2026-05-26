@@ -1,6 +1,5 @@
+from .features import IFeature, Features
 
-
-from .features import Features
-
+__all__ = ["IFeature", "Features"]
 
 

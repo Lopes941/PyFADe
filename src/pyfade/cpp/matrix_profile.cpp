@@ -22,7 +22,6 @@
     #include <cuda_runtime.h>
 #endif
 
-
 namespace cfade{
 
     std::shared_ptr<QTDataInterface> get_QT(const std::shared_ptr<DataSet> observed_dataset,
@@ -200,8 +199,18 @@ namespace cfade{
             return;
         }
         #endif
-        
-        // TODO
+        cpu_STOMP_iterations(observed_dataset, 
+                            means,
+                            stds, 
+                            QT->d_QT, 
+                            matrix_profile, 
+                            index, 
+                            start_loc, 
+                            final_size, 
+                            window_size,
+                            exclusion_zone_size,
+                            left_only);
+        return;
 
     }
 
@@ -216,8 +225,7 @@ namespace cfade{
             return std::make_shared<QTDataCUDA>(observed_dataset, means, stds, window_size);
         }
         #endif
-        // return std::make_shared<QTDataCPU>(observed_dataset, means, stds, window_size);
-        
+        return std::make_shared<QTDataCPU>(observed_dataset, means, stds, window_size);
         // TODO
 
     }
@@ -227,12 +235,10 @@ namespace cfade{
                         const std::shared_ptr<VectorGroup<double>> stds,
                         int window_size){
 
-        double * ad_QT = new double[means->total_size()];
-        cudaMalloc((void**) &d_QT, sizeof(double) * means->total_size());
 
-        for (int i=0; i<means->total_size();i++){
-            ad_QT[i] = 0;
-        }
+        d_QT = new double[means->total_size()];
+
+        std::fill(d_QT,d_QT + means->total_size(),0.0);
 
         // Getting flipped first interval padded
         int padded_size = observed_dataset->get_length() + window_size-1;
@@ -243,24 +249,21 @@ namespace cfade{
         for(int dimension=0; dimension<observed_dataset->get_dimension(); dimension++){
 
             for (int i=0; i<window_size; i++){
-                Q_padded[i] = observed_dataset->at(dimension,window_size-1-i);
+                Q_padded[i] = observed_dataset->at(dimension, window_size - 1 - i);
             }
 
             for(int i=0;i<observed_dataset->get_length(); i++){
                 series_padded[i] = observed_dataset->at(dimension,i);
             }
 
-            cpu_convolve(ad_QT+mp_size*dimension, series_padded.data(), Q_padded.data(), padded_size, window_size,mp_size);
+            cpu_convolve(d_QT+mp_size*dimension, series_padded.data(), Q_padded.data(), padded_size, window_size,mp_size);
         }
-
-        cudaMemcpy(d_QT,ad_QT, sizeof(double)* means->total_size(), cudaMemcpyHostToDevice);
-        delete[] ad_QT;
+        
     }
                         
 
     QTDataCPU::~QTDataCPU(){
-        // if(d_QT) delete[] d_QT;
-        if(d_QT) cudaFree(d_QT);
+        if(d_QT) delete[] d_QT;
     }
 
     #ifdef USE_CUDA

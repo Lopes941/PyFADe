@@ -1,3 +1,0 @@
-C:/Users/Heitor/Documents/PosDoc/code/_skbuild/win-amd64-3.12/cmake-build/CMakeFiles/my_backend.dir
-C:/Users/Heitor/Documents/PosDoc/code/_skbuild/win-amd64-3.12/cmake-build/CMakeFiles/edit_cache.dir
-C:/Users/Heitor/Documents/PosDoc/code/_skbuild/win-amd64-3.12/cmake-build/CMakeFiles/rebuild_cache.dir

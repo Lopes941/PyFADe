@@ -1,0 +1,6 @@
+sphinx
+sphinx_copybutton
+sphinx-rtd-theme
+sphinx_code_tabs
+myst-parser
+breathe
