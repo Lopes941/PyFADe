@@ -1,34 +1,88 @@
+*.pyc
+*.pyd
+*.pyo
+*.c
+*.html
 __pycache__
-*.csv
+*.so
+*.o
 *.gif
-*.py[co]
-.DS_Store
-.pytest_cache/
 
-
-# Packages
 *.egg
 *.egg-info
-dist
-build
-_build
-.installed.cfg
+.*cache*/
+*venv*/
+/.hg
 
-# Installer logs
-pip-log.txt
+/Cython/Build/*.c
+/Cython/Compiler/*.c
+/Cython/Debugger/*.c
+/Cython/Distutils/*.c
+/Cython/Parser/*.c
+/Cython/Plex/*.c
+/Cython/Runtime/refnanny.c
+/Cython/Tempita/*.c
+/Cython/*.c
+/Cython/*.html
+/Cython/*/*.html
 
-# Sphinx documentation
-doc/_build/
-doc/build/
-.jupyterlite.doit.db
-/doc/jupyter_execute/
-doc/source/regression/*.ipynb
+/Tools/*.elc
+/Demos/*.html
+/Demos/*/*.html
+/Demos/benchmarks/*.c
 
-# Editors
-.idea
-.project
-.pydevproject
-.settings
+/build_dir
+/TEST/
+/TEST_TMP/
+/build/
+/cython_build/
+cython_debug/
+/wheelhouse*/
+!tests/build/
+/dist/
+.gitrev
+.coverage
+coverage*.xml
+coverage*.html
+/coverage*/
+*.patch
+*.diff
+*.orig
+*.prof
+*.rej
+*.log
+*.dep
+*.swp
+*.gz
+*.bz2
+*.xz
+*~
+callgrind.out.*
+
+.ipynb_checkpoints
+docs/build
+docs/_build
+
+tags
+TAGS
+
+.tox
+
+# Jetbrains IDE project files
+/.idea
+/*.iml
+
+# Komodo EDIT/IDE project files
+/*.komodoproject
+
+# Visual Studio Code files
+.vscode
+
+extern
+extern/eigen
+
+.gitignore
+
 
 Documents/*
 Epic/*

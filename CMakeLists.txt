@@ -1,9 +1,6 @@
 cmake_minimum_required(VERSION 3.15)
 project(pyfade LANGUAGES CXX)
 
-# Enable CUDA if available
-enable_language(CUDA OPTIONAL)
-
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
