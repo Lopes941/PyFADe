@@ -5,8 +5,8 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 
-find_package(Python COMPONENTS Interpreter Development REQUIRED)
-find_package(pybind11 CONFIG REQUIRED)
+find_package(Python REQUIRED COMPONENTS Interpreter Development.Module)
+find_package(pybind11 REQUIRED)
 
 # ================================
 # PYFADE SOURCE FILES
