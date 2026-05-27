@@ -6,7 +6,7 @@ requires = [
 build-backend = "scikit_build_core.build"
 
 [project]
-name = "pyfade"
+name = "pyfade-esp"
 version = "0.1.0"
 description = "Matrix profile calculation module"
 authors = [{ name = "Heitor Lopes", email = "hnlopes@unicamp.br" }]

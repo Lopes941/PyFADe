@@ -27,7 +27,7 @@ PyFADe is available on `PyPI <https://pypi.org/project//>`_, and can be easily i
 
 .. code-block:: bash
 
-    pip install pyfade
+    pip install pyfade-esp
 
 PyFADe is available on Windows, MacOS and Linux.
 
