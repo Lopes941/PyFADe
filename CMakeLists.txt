@@ -68,6 +68,7 @@ else()
 endif()
 
 if (HAS_CUDA)
+    enable_language(CUDA)
     list(APPEND SOURCE_FILES ${CUDA_SOURCES})
 endif()
 

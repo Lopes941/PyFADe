@@ -5,8 +5,8 @@ import pywt
 
 import matplotlib.pyplot as plt
 
-from pyfade.group import IFeatureGroup,  IFeatureGroupParameter
-from pyfade.group import UseCudaParam, LeftOnlyParam, SkipStartParam, ExclusionZoneRatioParam, QuantileParam
+from .feature_groups import IFeatureGroup,  IFeatureGroupParameter
+from .feature_groups import UseCudaParam, LeftOnlyParam, SkipStartParam, ExclusionZoneRatioParam, QuantileParam
 
 from pyfade.features import Features
 from pyfade.series import DataFrame

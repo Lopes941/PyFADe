@@ -7,7 +7,7 @@ build-backend = "scikit_build_core.build"
 
 [project]
 name = "pyfade-esp"
-version = "0.1.1"
+version = "1.0.0"
 description = "Matrix profile calculation module"
 authors = [{ name = "Heitor Lopes", email = "hnlopes@unicamp.br" }]
 requires-python = ">=3.8"
@@ -33,10 +33,10 @@ classifiers = [
 wheel.packages = ["src/pyfade"]
 sdist.include = ["pyfade/**"]
 
-[tool.setuptools.package-data]
-pyfade = ["*.pyi", "stubs/pyfade/*.pyi","*.dll"]
 
 [tool.scikit-build.cmake]
 args = []
 build-type = "Release"
+
+[tool.scikit-build.build]
 verbose = false

@@ -1,9 +1,10 @@
 
 import numpy as np
 
-from pyfade.group import IFeatureGroup, ContinuousStatistics
+from .feature_groups import IFeatureGroup,  ContinuousStatistics
+
+
 from pyfade.features import Features
-from pyfade.group import DataFrame
 
 
 class PythonStatistics(IFeatureGroup):

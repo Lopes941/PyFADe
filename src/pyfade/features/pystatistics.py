@@ -1,5 +1,5 @@
 
-from pyfade.features import IFeature
+from ..core import IFeature
 
 class Meanpy(IFeature):
 
